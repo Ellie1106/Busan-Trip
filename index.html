@@ -1,0 +1,514 @@
+--- START OF FILE text/plain ---
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>旅遊計畫 App - 雲端同步版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- SortableJS & VueDraggable -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuedraggable@4.1.0/dist/vuedraggable.umd.min.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet 地圖 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        window.firebaseConfig = {
+            apiKey: "AIzaSyCf6r7yKD-KQalD66MAfCQ52kGldaB_aw0",
+            authDomain: "tripapp-49bb0.firebaseapp.com",
+            projectId: "tripapp-49bb0",
+            storageBucket: "tripapp-49bb0.firebasestorage.app",
+            messagingSenderId: "311178829456",
+            appId: "1:311178829456:web:6024956cd4aa7107d28215",
+            measurementId: "G-878K99280Z"
+        };
+
+        const fbApp = initializeApp(window.firebaseConfig);
+        window.db = getFirestore(fbApp);
+    </script>
+    
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 使用動態高度單位防止手機瀏覽器工具列遮擋 */
+        body { 
+            background-color: #f0ebe1; 
+            color: #4a4036; 
+            font-family: 'Helvetica Neue', Arial, sans-serif; 
+            height: 100dvh; 
+            margin: 0; 
+            overflow: hidden; 
+        }
+
+        #app { height: 100dvh; display: flex; flex-direction: column; }
+
+        .app-container { background-color: #f9f6f0; }
+        .bg-primary { background-color: #6a5a4e; }
+        .bg-primary-light { background-color: #8c7a6b; }
+        
+        /* 針對 iOS 安全區域優化 */
+        nav {
+            padding-bottom: env(safe-area-inset-bottom, 1.25rem);
+        }
+
+        .sortable-ghost { opacity: 0.4; background-color: #eae5dc; border-radius: 1rem; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(249, 246, 240, 0.9); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        
+        /* 地圖縮放按鈕層級 */
+        .leaflet-control-container { z-index: 10; }
+    </style>
+</head>
+<body>
+    <div id="app" class="max-w-md mx-auto app-container relative overflow-hidden shadow-2xl">
+        
+        <!-- 載入中遮罩 -->
+        <div v-if="isLoading" class="loading-overlay">
+            <div class="text-primary text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+                <p class="mt-2 font-bold text-sm">同步雲端資料...</p>
+            </div>
+        </div>
+
+        <!-- 左側選單 -->
+        <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-[#4a4036]/40 z-[500] backdrop-blur-sm transition-opacity"></div>
+        <div :class="isSidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed top-0 left-0 h-full w-64 bg-[#f9f6f0] z-[600] transition-transform duration-300 shadow-2xl flex flex-col">
+            <div class="p-5 bg-primary text-white">
+                <h2 class="text-lg font-bold tracking-widest"><i class="fa-solid fa-suitcase-rolling mr-2"></i>我的旅程</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                <button v-for="trip in trips" :key="trip.id" @click="selectTrip(trip.id)" 
+                        class="w-full text-left p-3.5 rounded-2xl border transition-all" 
+                        :class="currentTripId === trip.id ? 'border-primary bg-white shadow-md' : 'border-transparent hover:bg-[#eae5dc]'">
+                    <div class="font-bold text-[#4a4036] text-sm">{{ trip.name }}</div>
+                    <div class="text-[10px] text-[#8c7a6b] mt-1 font-mono">
+                        {{ trip.dates[0] }} ➔ {{ trip.dates[trip.dates.length-1] }}
+                    </div>
+                </button>
+            </div>
+            <div class="p-4 border-t border-[#e8e2d9]">
+                <button @click="openAddTripModal" class="w-full bg-[#eae5dc] text-primary font-bold py-3 rounded-xl hover:bg-[#dcd3cb] active:scale-95 transition-transform text-sm">
+                    <i class="fa-solid fa-plus mr-1"></i> 新增旅程
+                </button>
+            </div>
+        </div>
+
+        <!-- Header (縮小版) -->
+        <header class="bg-primary text-[#f9f6f0] pt-8 pb-3 px-5 rounded-b-2xl shadow-md z-20 shrink-0 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button @click="isSidebarOpen = true" class="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center text-lg transition-colors">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide">{{ currentTrip ? currentTrip.name : '選擇旅程' }}</h1>
+                    <p class="text-[#dcd3cb] text-[10px] font-medium">{{ tabs[currentTab].title }}</p>
+                </div>
+            </div>
+            <div v-if="currentTrip" class="text-[10px] bg-white/10 px-2 py-1 rounded-md border border-white/10">
+                匯率: {{ currentTrip.exchangeRate }}
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto no-scrollbar relative" v-if="currentTrip">
+            
+            <!-- Tab 1: 行程表 -->
+            <div v-show="currentTab === 'itinerary'" class="p-4 pb-20">
+                <!-- 天數選擇器 -->
+                <div class="flex overflow-x-auto no-scrollbar mb-4 py-1 gap-2 snap-x">
+                    <button v-for="(date, index) in currentTrip.dates" :key="date" 
+                            @click="selectedDate = date"
+                            class="flex-none w-16 h-14 rounded-xl text-xs font-bold transition-all shadow-sm flex flex-col items-center justify-center snap-center border"
+                            :class="selectedDate === date ? 'bg-primary-light text-white scale-105 border-primary-light' : 'bg-white text-[#8c7a6b] border-[#e8e2d9]'">
+                        <span class="text-[9px] font-normal mb-0.5 opacity-80">Day {{ index + 1 }}</span>
+                        {{ date }}
+                    </button>
+                </div>
+
+                <!-- 天氣資訊列 -->
+                <div v-if="currentDayWeather" class="bg-white border border-[#e8e2d9] rounded-xl p-3 mb-4 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="text-xl text-amber-500">
+                            <i :class="getWeatherIcon(currentDayWeather.type)"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-[#4a4036]">{{ currentDayWeather.type }}</div>
+                            <div class="text-[10px] text-[#8c7a6b]">{{ currentDayWeather.tempLow }}°C - {{ currentDayWeather.tempHigh }}°C</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[9px] font-bold text-blue-500">降雨機率</div>
+                        <div class="text-xs font-mono font-bold">{{ currentDayWeather.rainChance }}%</div>
+                    </div>
+                </div>
+
+                <!-- 拖曳行程清單 -->
+                <div class="relative border-l-2 border-[#dcd3cb] ml-2.5 pb-8">
+                    <draggable v-model="currentDayItinerary" item-key="id" handle=".drag-handle" ghost-class="sortable-ghost" :animation="200">
+                        <template #item="{ element: item }">
+                            <div class="relative pl-5 mb-5">
+                                <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10"></div>
+                                <div :class="item.type === 'flight' ? 'bg-primary text-white border-2 border-primary-light' : 'bg-white border border-[#e8e2d9] text-[#4a4036]'" class="p-3.5 rounded-xl shadow-sm relative overflow-hidden">
+                                    <div class="flex justify-between items-start mb-1 relative z-10">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold text-xs font-mono tracking-wide opacity-90">
+                                                <i :class="item.type === 'flight' ? 'fa-solid fa-plane' : 'fa-regular fa-clock'" class="mr-1"></i>
+                                                {{ item.time }}
+                                            </span>
+                                        </div>
+                                        <div class="flex space-x-3 items-center">
+                                            <button @click="openEditModal(item)" class="opacity-60 hover:opacity-100"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                                            <button class="drag-handle cursor-grab opacity-40 hover:opacity-80 px-1">
+                                                <i class="fa-solid fa-grip-lines text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <h3 class="font-bold text-sm relative z-10">{{ item.title }}</h3>
+                                    <p v-if="item.remark" :class="item.type === 'flight' ? 'bg-black/10 text-white/80' : 'bg-[#f9f6f0] text-[#8c7a6b]'" class="text-[10px] mt-2 p-2 rounded-lg font-medium relative z-10">
+                                        {{ item.remark }}
+                                    </p>
+                                </div>
+                            </div>
+                        </template>
+                    </draggable>
+                </div>
+
+                <!-- 懸浮新增按鈕 -->
+                <button @click="openAddModal" class="fixed bottom-24 right-6 w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center text-xl hover:bg-primary-light active:scale-90 transition-all z-30">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            <!-- Tab 2: 地圖 -->
+            <div v-show="currentTab === 'map'" class="h-full w-full relative">
+                <div id="leaflet-map" class="w-full h-full z-0"></div>
+                <div class="absolute top-3 left-3 right-3 bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-lg z-[400] border border-[#e8e2d9]">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-[#4a4036] text-xs"><i class="fa-solid fa-location-dot text-primary mr-2"></i>Day {{ currentTrip.dates.indexOf(selectedDate) + 1 }} 景點佈局</h3>
+                        <button @click="locateUser" class="bg-primary text-white text-[10px] px-3 py-1.5 rounded-lg active:scale-95">
+                            <i class="fa-solid fa-crosshairs mr-1"></i> 定位
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: 分帳 -->
+            <div v-show="currentTab === 'split'" class="p-4 pb-20 space-y-5">
+                <div class="bg-primary rounded-xl p-4 text-white shadow-md">
+                    <h3 class="text-sm font-bold mb-3 border-b border-white/20 pb-2">結算清單</h3>
+                    <ul class="space-y-2">
+                        <li v-for="(settlement, index) in settlements" :key="index" class="bg-white/10 px-3 py-2 rounded-lg text-xs flex justify-between items-center">
+                            <span>{{ settlement.from }} ➔ {{ settlement.to }}</span>
+                            <span class="font-mono font-bold">${{ settlement.amount.toLocaleString() }}</span>
+                        </li>
+                    </ul>
+                </div>
+                <!-- 花費輸入 -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-[#e8e2d9]">
+                    <h3 class="text-xs font-bold text-[#4a4036] mb-3">新增一筆花費</h3>
+                    <div class="space-y-2">
+                        <input v-model="newExpense.item" type="text" placeholder="項目" class="w-full bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs focus:outline-none">
+                        <div class="flex gap-2">
+                            <input v-model.number="newExpense.amount" type="number" placeholder="金額" class="w-2/3 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs font-mono">
+                            <select v-model="newExpense.paidBy" class="w-1/3 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-2 py-2 text-[10px]">
+                                <option v-for="person in currentTrip.people" :value="person">{{ person }}</option>
+                            </select>
+                        </div>
+                        <button @click="addExpense" class="w-full bg-primary text-white rounded-lg py-2.5 font-bold text-xs active:scale-95 transition-transform">加入記帳</button>
+                    </div>
+                </div>
+                <!-- 歷史清單 -->
+                <div class="space-y-2">
+                    <div v-for="exp in currentTrip.expenses" :key="exp.id" class="bg-white p-3 rounded-lg shadow-sm border border-[#e8e2d9] flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-[#4a4036] text-xs">{{ exp.item }}</p>
+                            <p class="text-[9px] text-[#8c7a6b]">{{ exp.paidBy }} 付款</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <p class="font-bold text-primary font-mono text-xs">${{ exp.amount }}</p>
+                            <button @click="deleteExpense(exp.id)" class="text-[#dcd3cb] hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation (修正位置) -->
+        <nav class="bg-white border-t border-[#dcd3cb] px-4 py-2 flex justify-around shrink-0 z-40">
+            <button v-for="(tabInfo, key) in tabs" :key="key" @click="currentTab = key" class="flex flex-col items-center p-1 w-16 transition-all" :class="currentTab === key ? 'text-primary' : 'text-[#bfae9f]'">
+                <i :class="tabInfo.icon" class="text-lg mb-0.5"></i>
+                <span class="text-[9px] font-bold">{{ tabInfo.label }}</span>
+                <div v-if="currentTab === key" class="w-1 h-1 bg-primary rounded-full mt-0.5"></div>
+            </button>
+        </nav>
+
+        <!-- 行程 Modal -->
+        <div v-if="isModalOpen" class="fixed inset-0 bg-[#4a4036]/60 z-[700] flex items-end justify-center backdrop-blur-sm">
+            <div class="bg-[#f9f6f0] w-full max-w-md rounded-t-2xl p-5 pb-8 shadow-2xl max-h-[85vh] overflow-y-auto no-scrollbar">
+                <div class="flex justify-between items-center mb-4 border-b border-[#e8e2d9] pb-3">
+                    <h2 class="text-lg font-bold text-[#4a4036]">{{ modalMode === 'add' ? '新增項目' : '編輯項目' }}</h2>
+                    <button @click="closeModal" class="text-[#8c7a6b] w-8 h-8 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex bg-[#eae5dc] p-1 rounded-xl">
+                        <button @click="form.type = 'normal'" :class="form.type === 'normal' ? 'bg-white shadow-sm text-[#4a4036]' : 'text-[#8c7a6b]'" class="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all">一般行程</button>
+                        <button @click="form.type = 'flight'" :class="form.type === 'flight' ? 'bg-primary shadow-sm text-white' : 'text-[#8c7a6b]'" class="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all">航班</button>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-1/2">
+                            <label class="text-[10px] text-[#8c7a6b] font-bold uppercase">日期</label>
+                            <select v-model="form.date" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
+                                <option v-for="d in currentTrip.dates" :value="d">{{ d }}</option>
+                            </select>
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-[10px] text-[#8c7a6b] font-bold uppercase">時間</label>
+                            <input v-model="form.time" type="time" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-[#8c7a6b] font-bold uppercase">標題</label>
+                        <input v-model="form.title" type="text" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
+                    </div>
+                    <div v-if="form.type === 'normal'">
+                        <label class="text-[10px] text-[#8c7a6b] font-bold uppercase">Google Map 網址</label>
+                        <input v-model="form.googleMapUrl" type="url" placeholder="貼上網址自動抓座標" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-[10px] mt-1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-[#8c7a6b] font-bold uppercase">備註</label>
+                        <textarea v-model="form.remark" rows="2" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1"></textarea>
+                    </div>
+                    <button @click="saveItinerary" class="w-full bg-primary text-white rounded-lg py-3 font-bold text-sm active:scale-95 transition-all">儲存行程</button>
+                    <button v-if="modalMode === 'edit'" @click="deleteItinerary(form.id)" class="w-full text-red-500 font-bold text-xs py-2">刪除此項</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新增旅程 Modal -->
+        <div v-if="isAddTripModalOpen" class="fixed inset-0 bg-[#4a4036]/60 z-[700] flex items-center justify-center backdrop-blur-sm p-4">
+            <div class="bg-[#f9f6f0] w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-[#e8e2d9]">
+                <h2 class="text-lg font-bold text-[#4a4036] mb-5 border-b border-[#e8e2d9] pb-3">建立新旅程</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] text-[#8c7a6b] font-bold ml-1">旅程名稱</label>
+                        <input v-model="newTripForm.name" type="text" placeholder="例如：2026 釜山之旅" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2.5 mt-1 text-xs focus:outline-none">
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-1/2">
+                            <label class="text-[10px] text-[#8c7a6b] font-bold ml-1">出發日</label>
+                            <input v-model="newTripForm.startDate" type="date" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-2 py-2 mt-1 text-[10px]">
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-[10px] text-[#8c7a6b] font-bold ml-1">回程日</label>
+                            <input v-model="newTripForm.endDate" type="date" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-2 py-2 mt-1 text-[10px]">
+                        </div>
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button @click="isAddTripModalOpen = false" class="flex-1 bg-[#eae5dc] text-[#8c7a6b] font-bold py-2.5 rounded-lg text-xs">取消</button>
+                        <button @click="createNewTrip" class="flex-1 bg-primary text-white font-bold py-2.5 rounded-lg text-xs">建立旅程</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        const { createApp, ref, computed, reactive, watch, nextTick, onMounted } = Vue;
+        import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const app = createApp({
+            setup() {
+                const isLoading = ref(true);
+                const currentTab = ref('itinerary');
+                const isSidebarOpen = ref(false);
+                const tabs = {
+                    itinerary: { label: '行程', title: '我的行程表', icon: 'fa-regular fa-calendar' },
+                    map: { label: '地圖', title: '景點分布圖', icon: 'fa-solid fa-map-marked-alt' },
+                    split: { label: '分帳', title: '費用支出明細', icon: 'fa-solid fa-wallet' }
+                };
+
+                const trips = ref([]);
+                const currentTripId = ref(null);
+                const selectedDate = ref('');
+
+                // Firebase 同步邏輯 (保持原樣)
+                const saveToCloud = async () => {
+                    if (trips.value.length === 0) return;
+                    try {
+                        await setDoc(doc(window.db, "appData", "user_trips"), { 
+                            trips: JSON.parse(JSON.stringify(trips.value)),
+                            lastUpdate: new Date().getTime()
+                        });
+                        console.log("Synced to cloud");
+                    } catch (e) { console.error("Sync error", e); }
+                };
+
+                const loadFromCloud = async () => {
+                    isLoading.value = true;
+                    try {
+                        const docRef = doc(window.db, "appData", "user_trips");
+                        const docSnap = await getDoc(docRef);
+                        if (docSnap.exists()) {
+                            trips.value = docSnap.data().trips;
+                            if (trips.value.length > 0) {
+                                currentTripId.value = trips.value[0].id;
+                                selectedDate.value = trips.value[0].dates[0];
+                            }
+                        } else {
+                            // 預設範例資料
+                            trips.value = [{
+                                id: 1, name: '2026 釜山之旅 🇰🇷', dates:['5/13', '5/14', '5/15', '5/16', '5/17'], exchangeRate: 0.0235, people:['自己', '旅伴A'], expenses:[],
+                                weather: { '5/13': { type: '晴天', tempLow: 18, tempHigh: 24, rainChance: 10 } },
+                                itinerary:[]
+                            }];
+                            currentTripId.value = 1; selectedDate.value = '5/13';
+                        }
+                    } catch (e) { console.error(e); } 
+                    finally { isLoading.value = false; }
+                };
+
+                onMounted(() => {
+                    const checkDB = setInterval(() => {
+                        if (window.db) { clearInterval(checkDB); loadFromCloud(); }
+                    }, 100);
+                });
+
+                watch(trips, () => { saveToCloud(); }, { deep: true });
+
+                const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
+                const currentDayWeather = computed(() => (currentTrip.value?.weather?.[selectedDate.value]) || null);
+
+                const getWeatherIcon = (type) => {
+                    if (type?.includes('雨')) return 'fa-solid fa-cloud-showers-heavy';
+                    if (type?.includes('雲')) return 'fa-solid fa-cloud-sun';
+                    return 'fa-solid fa-sun';
+                };
+
+                const selectTrip = (id) => {
+                    currentTripId.value = id;
+                    selectedDate.value = currentTrip.value.dates[0];
+                    isSidebarOpen.value = false;
+                };
+
+                const isAddTripModalOpen = ref(false);
+                const newTripForm = reactive({ name: '', startDate: '', endDate: '' });
+                const openAddTripModal = () => { isAddTripModalOpen.value = true; };
+                const createNewTrip = () => {
+                    if(!newTripForm.name || !newTripForm.startDate || !newTripForm.endDate) return;
+                    let dates =[]; let curr = new Date(newTripForm.startDate); let end = new Date(newTripForm.endDate);
+                    while(curr <= end) { dates.push(`${curr.getMonth()+1}/${curr.getDate()}`); curr.setDate(curr.getDate() + 1); }
+                    const newId = Date.now();
+                    trips.value.push({ id: newId, name: newTripForm.name, dates, exchangeRate: 1, people:['自己', '旅伴A'], expenses:[], itinerary:[], weather:{} });
+                    selectTrip(newId); isAddTripModalOpen.value = false;
+                };
+
+                const currentDayItinerary = computed({
+                    get() { return (currentTrip.value?.itinerary || []).filter(i => i.date === selectedDate.value).sort((a, b) => a.order - b.order); },
+                    set(newList) {
+                        newList.forEach((item, index) => { item.order = index; });
+                        const others = currentTrip.value.itinerary.filter(i => i.date !== selectedDate.value);
+                        currentTrip.value.itinerary = [...others, ...newList];
+                    }
+                });
+
+                const isModalOpen = ref(false);
+                const modalMode = ref('add');
+                const form = reactive({ id: null, date: '', time: '', type: 'normal', title: '', googleMapUrl: '', lat: null, lng: null, remark: '' });
+
+                watch(() => form.googleMapUrl, (url) => {
+                    const match = url?.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                    if (match) { form.lat = parseFloat(match[1]); form.lng = parseFloat(match[2]); }
+                });
+
+                const openAddModal = () => {
+                    modalMode.value = 'add';
+                    Object.assign(form, { id: Date.now(), date: selectedDate.value, time: '10:00', type: 'normal', title: '', googleMapUrl: '', lat: null, lng: null, remark: '' });
+                    isModalOpen.value = true;
+                };
+                const openEditModal = (item) => { modalMode.value = 'edit'; Object.assign(form, item); isModalOpen.value = true; };
+                const closeModal = () => { isModalOpen.value = false; };
+                const saveItinerary = () => {
+                    if (modalMode.value === 'add') currentTrip.value.itinerary.push({ ...form, order: currentDayItinerary.value.length });
+                    else {
+                        const idx = currentTrip.value.itinerary.findIndex(i => i.id === form.id);
+                        currentTrip.value.itinerary[idx] = { ...form };
+                    }
+                    closeModal();
+                };
+                const deleteItinerary = (id) => { currentTrip.value.itinerary = currentTrip.value.itinerary.filter(i => i.id !== id); closeModal(); };
+
+                let map = null, markers = null;
+                const initMap = () => {
+                    if (map) return;
+                    map = L.map('leaflet-map', { zoomControl: false }).setView([35.1524, 129.0596], 13);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+                    markers = L.layerGroup().addTo(map);
+                };
+                const updateMarkers = () => {
+                    if (!markers) return; markers.clearLayers();
+                    const pts = [];
+                    currentDayItinerary.value.forEach(i => {
+                        if (i.lat) {
+                            L.marker([i.lat, i.lng]).addTo(markers).bindPopup(i.title);
+                            pts.push([i.lat, i.lng]);
+                        }
+                    });
+                    if (pts.length) map.fitBounds(pts, { padding: [40, 40] });
+                };
+                watch(currentTab, async (t) => { if (t === 'map') { await nextTick(); initMap(); map.invalidateSize(); updateMarkers(); } });
+                const locateUser = () => { navigator.geolocation.getCurrentPosition(p => map.setView([p.coords.latitude, p.coords.longitude], 15)); };
+
+                const newExpense = reactive({ item: '', amount: null, paidBy: '自己' });
+                const addExpense = () => {
+                    if (!newExpense.amount || !newExpense.item) return;
+                    currentTrip.value.expenses.push({ id: Date.now(), ...newExpense });
+                    newExpense.item = ''; newExpense.amount = null;
+                };
+                const deleteExpense = (id) => { currentTrip.value.expenses = currentTrip.value.expenses.filter(e => e.id !== id); };
+                const settlements = computed(() => {
+                    if (!currentTrip.value) return [];
+                    const bal = {}; currentTrip.value.people.forEach(p => bal[p] = 0);
+                    currentTrip.value.expenses.forEach(e => {
+                        bal[e.paidBy] += e.amount;
+                        const share = e.amount / currentTrip.value.people.length;
+                        currentTrip.value.people.forEach(p => bal[p] -= share);
+                    });
+                    const res = [];
+                    const debtors = Object.entries(bal).filter(x => x[1] < -1).map(x => ({p:x[0], b:Math.abs(x[1])}));
+                    const creditors = Object.entries(bal).filter(x => x[1] > 1).map(x => ({p:x[0], b:x[1]}));
+                    let d=0, c=0;
+                    while(d<debtors.length && c<creditors.length) {
+                        let amt = Math.min(debtors[d].b, creditors[c].b);
+                        res.push({ from: debtors[d].p, to: creditors[c].p, amount: Math.round(amt) });
+                        debtors[d].b -= amt; creditors[c].b -= amt;
+                        if(debtors[d].b < 1) d++; if(creditors[c].b < 1) c++;
+                    }
+                    return res;
+                });
+
+                return {
+                    isLoading, currentTab, tabs, isSidebarOpen, trips, currentTripId, currentTrip, selectTrip,
+                    isAddTripModalOpen, newTripForm, openAddTripModal, createNewTrip, selectedDate,
+                    currentDayItinerary, isModalOpen, modalMode, form, openAddModal, openEditModal, closeModal, saveItinerary, deleteItinerary,
+                    locateUser, newExpense, addExpense, deleteExpense, settlements, currentDayWeather, getWeatherIcon
+                };
+            }
+        });
+
+        app.component('draggable', window.vuedraggable);
+        app.mount('#app');
+    </script>
+</body>
+</html>

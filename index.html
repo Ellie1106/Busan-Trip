@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>旅遊計畫 App - UI 優化版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuedraggable@4.1.0/dist/vuedraggable.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        window.firebaseConfig = {
+            apiKey: "AIzaSyCf6r7yKD-KQalD66MAfCQ52kGldaB_aw0",
+            authDomain: "tripapp-49bb0.firebaseapp.com",
+            projectId: "tripapp-49bb0",
+            storageBucket: "tripapp-49bb0.firebasestorage.app",
+            messagingSenderId: "311178829456",
+            appId: "1:311178829456:web:6024956cd4aa7107d28215",
+            measurementId: "G-878K99280Z"
+        };
+
+        const fbApp = initializeApp(window.firebaseConfig);
+        window.db = getFirestore(fbApp);
+    </script>
+    
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { 
+            background-color: #f0ebe1; 
+            color: #4a4036; 
+            font-family: 'Helvetica Neue', Arial, sans-serif; 
+            overflow: hidden;
+            height: 100vh;
+            /* 修正行動裝置 100vh 包含網址列的問題 */
+            height: -webkit-fill-available;
+        }
+        .app-container { 
+            box-shadow: 0 0 30px rgba(92, 77, 67, 0.15); 
+            background-color: #f9f6f0; 
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .bg-primary { background-color: #6a5a4e; }
+        .bg-primary-light { background-color: #8c7a6b; }
+        .text-primary { color: #6a5a4e; }
+        .sortable-ghost { opacity: 0.4; background-color: #eae5dc; border-radius: 1rem; }
+        .leaflet-top, .leaflet-bottom { z-index: 100 !important; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(249, 246, 240, 0.9); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        
+        /* 底部導航欄優化 */
+        nav {
+            padding-bottom: env(safe-area-inset-bottom, 1.25rem);
+            background: rgba(249, 246, 240, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="max-w-md mx-auto app-container relative overflow-hidden">
+        
+        <div v-if="isLoading" class="loading-overlay">
+            <div class="text-primary text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+                <p class="mt-2 font-bold text-sm tracking-widest">同步雲端資料...</p>
+            </div>
+        </div>
+
+        <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-[#4a4036]/40 z-[500] backdrop-blur-sm transition-opacity"></div>
+        <div :class="isSidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed top-0 left-0 h-full w-64 bg-[#f9f6f0] z-[600] transition-transform duration-300 shadow-2xl flex flex-col">
+            <div class="p-6 bg-primary text-white">
+                <h2 class="text-xl font-bold tracking-widest"><i class="fa-solid fa-suitcase-rolling mr-2"></i>我的旅程</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                <button v-for="trip in trips" :key="trip.id" @click="selectTrip(trip.id)" 
+                        class="w-full text-left p-3.5 rounded-2xl border transition-all" 
+                        :class="currentTripId === trip.id ? 'border-primary bg-white shadow-md' : 'border-transparent hover:bg-[#eae5dc]'">
+                    <div class="font-bold text-[#4a4036] text-sm">{{ trip.name }}</div>
+                    <div class="text-[11px] text-[#8c7a6b] mt-1 font-mono">
+                        {{ trip.dates[0] }} ➔ {{ trip.dates[trip.dates.length-1] }}
+                    </div>
+                </button>
+            </div>
+            <div class="p-4 border-t border-[#e8e2d9]">
+                <button @click="openAddTripModal" class="w-full bg-[#eae5dc] text-primary font-bold py-3.5 rounded-2xl hover:bg-[#dcd3cb] active:scale-95 transition-transform text-sm shadow-sm">
+                    <i class="fa-solid fa-plus mr-1"></i> 新增其他旅程
+                </button>
+            </div>
+        </div>
+
+        <header class="bg-primary text-[#f9f6f0] pt-8 pb-4 px-5 rounded-b-[2.5rem] shadow-lg z-20 shrink-0 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-3">
+                <button @click="isSidebarOpen = true" class="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-xl transition-colors">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wider">{{ currentTrip ? currentTrip.name : '選擇旅程' }}</h1>
+                    <p class="text-[#dcd3cb] text-[10px] font-medium opacity-80 uppercase tracking-tighter">{{ tabs[currentTab].title }}</p>
+                </div>
+            </div>
+            <div class="w-10 h-10 flex items-center justify-center opacity-50">
+                <i class="fa-solid fa-plane-departure"></i>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto no-scrollbar pb-32 relative flex flex-col" v-if="currentTrip">
+            
+            <div v-show="currentTab === 'itinerary'" class="p-5">
+                <div class="flex overflow-x-auto no-scrollbar mb-4 py-1 gap-3 snap-x">
+                    <button v-for="(date, index) in currentTrip.dates" :key="date" 
+                            @click="selectedDate = date"
+                            class="flex-none w-16 h-20 rounded-2xl text-sm font-bold transition-all shadow-sm flex flex-col items-center justify-center snap-center"
+                            :class="selectedDate === date ? 'bg-primary text-white scale-105 shadow-lg' : 'bg-white text-[#8c7a6b] border border-[#e8e2d9]'">
+                        <span class="text-[9px] font-normal mb-1 opacity-70">Day {{ index + 1 }}</span>
+                        <span class="text-xs">{{ date }}</span>
+                    </button>
+                </div>
+
+                <div v-if="currentDayWeather" class="bg-white/80 border border-[#e8e2d9] rounded-2xl p-4 mb-6 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-4">
+                        <div class="text-3xl text-amber-500">
+                            <i :class="getWeatherIcon(currentDayWeather.type)"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-[#4a4036]">{{ currentDayWeather.type }}</div>
+                            <div class="text-[11px] text-[#8c7a6b] font-mono">{{ currentDayWeather.tempLow }}°C - {{ currentDayWeather.tempHigh }}°C</div>
+                        </div>
+                    </div>
+                    <div class="bg-[#f0ebe1]/50 px-3 py-1 rounded-full text-right">
+                        <span class="text-[10px] font-bold text-blue-500 mr-1"><i class="fa-solid fa-droplet"></i></span>
+                        <span class="text-xs font-mono font-bold">{{ currentDayWeather.rainChance }}%</span>
+                    </div>
+                </div>
+
+                <div class="relative border-l-2 border-[#dcd3cb] ml-3 pb-8 mt-2">
+                    <draggable v-model="currentDayItinerary" item-key="id" handle=".drag-handle" ghost-class="sortable-ghost" :animation="200">
+                        <template #item="{ element: item }">
+                            <div class="relative pl-7 mb-6">
+                                <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-2 border-2 border-[#f9f6f0] z-10"></div>
+                                <div :class="item.type === 'flight' ? 'bg-primary text-[#f9f6f0] border-primary-light border-dashed' : 'bg-white border border-[#e8e2d9] text-[#4a4036]'" class="p-4 rounded-2xl shadow-sm relative overflow-hidden transition-all active:scale-[0.98]">
+                                    <div class="flex justify-between items-start mb-2 relative z-10">
+                                        <div class="flex items-center gap-2">
+                                            <span :class="item.type === 'flight' ? 'bg-white/20 px-2 py-0.5 rounded-md text-white' : 'text-primary font-bold'" class="text-xs font-mono tracking-wide">
+                                                {{ item.time }}
+                                            </span>
+                                        </div>
+                                        <div class="flex space-x-3 items-center">
+                                            <button @click="openEditModal(item)" class="opacity-40 hover:opacity-100 transition-opacity"><i class="fa-solid fa-pen text-xs"></i></button>
+                                            <button class="drag-handle cursor-grab active:cursor-grabbing px-1 opacity-30">
+                                                <i class="fa-solid fa-grip-lines text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <h3 class="font-bold text-base relative z-10">{{ item.title }}</h3>
+                                    <p v-if="item.remark" class="text-[11px] mt-2 opacity-70 italic">{{ item.remark }}</p>
+                                </div>
+                            </div>
+                        </template>
+                    </draggable>
+                </div>
+
+                <button @click="openAddModal" class="fixed bottom-24 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center text-2xl hover:bg-primary-light transition-all active:scale-90 z-30">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            <div v-show="currentTab === 'map'" class="flex-1 w-full h-full relative">
+                <div id="leaflet-map" class="w-full h-full z-0 absolute inset-0"></div>
+            </div>
+
+            <div v-show="currentTab === 'split'" class="p-5 space-y-4">
+                 <div class="bg-primary rounded-2xl p-5 text-white shadow-md">
+                    <h3 class="font-bold mb-3 border-b border-white/20 pb-2 text-sm">結算清單</h3>
+                    <ul class="space-y-2">
+                        <li v-for="(settlement, index) in settlements" :key="index" class="bg-white/10 px-3 py-2 rounded-xl text-xs flex justify-between items-center">
+                            <span>{{ settlement.from }} ➔ {{ settlement.to }}</span>
+                            <span class="font-bold font-mono">{{ settlement.amount.toLocaleString() }}</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-[#e8e2d9] shadow-sm">
+                    <input v-model="newExpense.item" type="text" placeholder="項目" class="w-full bg-[#f9f6f0] border rounded-xl px-4 py-2 mb-2 text-sm focus:outline-none">
+                    <div class="flex gap-2">
+                        <input v-model.number="newExpense.amount" type="number" placeholder="金額" class="w-2/3 bg-[#f9f6f0] border rounded-xl px-4 py-2 text-sm focus:outline-none">
+                        <select v-model="newExpense.paidBy" class="w-1/3 bg-[#f9f6f0] border rounded-xl px-2 text-xs focus:outline-none">
+                            <option v-for="person in currentTrip.people" :value="person">{{ person }}</option>
+                        </select>
+                    </div>
+                    <button @click="addExpense" class="w-full bg-primary text-white rounded-xl py-2.5 font-bold text-sm mt-3">新增支出</button>
+                </div>
+            </div>
+        </main>
+
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto border-t border-[#dcd3cb] px-8 pt-3 flex justify-around z-[400]">
+            <button v-for="(tabInfo, key) in tabs" :key="key" @click="currentTab = key" 
+                    class="flex flex-col items-center pb-2 transition-all relative group" 
+                    :class="currentTab === key ? 'text-primary scale-110' : 'text-[#bfae9f]'">
+                <div v-if="currentTab === key" class="absolute -top-3 w-8 h-1 bg-primary rounded-full"></div>
+                <i :class="tabInfo.icon" class="text-xl mb-1"></i>
+                <span class="text-[9px] font-bold tracking-tighter">{{ tabInfo.label }}</span>
+            </button>
+        </nav>
+
+        <div v-if="isModalOpen" class="fixed inset-0 bg-[#4a4036]/60 z-[1000] flex items-end justify-center backdrop-blur-sm p-4">
+            <div class="bg-[#f9f6f0] w-full max-w-md rounded-[2.5rem] p-6 pb-10 shadow-2xl animate-slide-up">
+                <div class="flex justify-between items-center mb-6 px-2">
+                    <h2 class="text-lg font-bold text-[#4a4036]">{{ modalMode === 'add' ? '新增行程' : '編輯行程' }}</h2>
+                    <button @click="closeModal" class="bg-[#eae5dc] w-8 h-8 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex gap-3">
+                        <div class="w-1/2">
+                            <label class="text-[10px] font-bold text-[#8c7a6b] ml-2">日期</label>
+                            <select v-model="form.date" class="w-full bg-white border border-[#dcd3cb] rounded-2xl px-4 py-3 mt-1 focus:outline-none text-sm">
+                                <option v-for="d in currentTrip.dates" :value="d">{{ d }}</option>
+                            </select>
+                        </div>
+                        <div class="w-1/2">
+                            <label class="text-[10px] font-bold text-[#8c7a6b] ml-2">時間</label>
+                            <input v-model="form.time" type="time" class="w-full bg-white border border-[#dcd3cb] rounded-2xl px-4 py-3 mt-1 focus:outline-none text-sm">
+                        </div>
+                    </div>
+                    <input v-model="form.title" type="text" placeholder="去哪裡？" class="w-full bg-white border border-[#dcd3cb] rounded-2xl px-4 py-3 focus:outline-none text-sm">
+                    <textarea v-model="form.remark" rows="2" placeholder="備註..." class="w-full bg-white border border-[#dcd3cb] rounded-2xl px-4 py-3 focus:outline-none text-sm"></textarea>
+                    <button @click="saveItinerary" class="w-full bg-primary text-white rounded-2xl py-4 font-bold shadow-lg hover:bg-primary-light transition-all active:scale-95">確認儲存</button>
+                    <button v-if="modalMode === 'edit'" @click="deleteItinerary(form.id)" class="w-full text-red-400 text-xs font-bold py-2 mt-1">刪除此行程</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="isAddTripModalOpen" class="fixed inset-0 bg-[#4a4036]/60 z-[1100] flex items-center justify-center backdrop-blur-sm p-6">
+            <div class="bg-[#f9f6f0] w-full rounded-[2rem] p-6 shadow-2xl">
+                <h2 class="text-lg font-bold mb-4">建立新旅程</h2>
+                <input v-model="newTripForm.name" type="text" placeholder="旅程名稱" class="w-full bg-white border rounded-xl px-4 py-3 mb-3 focus:outline-none text-sm">
+                <div class="flex gap-2 mb-4">
+                    <input v-model="newTripForm.startDate" type="date" class="w-1/2 bg-white border rounded-xl px-4 py-2 text-xs">
+                    <input v-model="newTripForm.endDate" type="date" class="w-1/2 bg-white border rounded-xl px-4 py-2 text-xs">
+                </div>
+                <div class="flex gap-2">
+                    <button @click="isAddTripModalOpen = false" class="flex-1 bg-gray-200 py-3 rounded-xl font-bold">取消</button>
+                    <button @click="createNewTrip" class="flex-1 bg-primary text-white py-3 rounded-xl font-bold">建立</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        const { createApp, ref, computed, reactive, watch, nextTick, onMounted } = Vue;
+        import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const app = createApp({
+            setup() {
+                const isLoading = ref(true);
+                const currentTab = ref('itinerary');
+                const isSidebarOpen = ref(false);
+                const tabs = {
+                    itinerary: { label: '行程', title: 'ITINERARY & FLIGHTS', icon: 'fa-regular fa-calendar-check' },
+                    map: { label: '地圖', title: 'LOCATION MAP', icon: 'fa-solid fa-map-location-dot' },
+                    split: { label: '分帳', title: 'EXPENSE TRACKER', icon: 'fa-solid fa-coins' }
+                };
+
+                const trips = ref([]);
+                const currentTripId = ref(null);
+                const selectedDate = ref('');
+
+                // Firebase Sync Logic (保持不變)
+                const saveToCloud = async () => {
+                    if (trips.value.length === 0) return;
+                    try {
+                        await setDoc(doc(window.db, "appData", "user_trips"), { 
+                            trips: JSON.parse(JSON.stringify(trips.value)),
+                            lastUpdate: new Date().getTime()
+                        });
+                    } catch (e) { console.error("Sync Error", e); }
+                };
+
+                const loadFromCloud = async () => {
+                    isLoading.value = true;
+                    try {
+                        const docSnap = await getDoc(doc(window.db, "appData", "user_trips"));
+                        if (docSnap.exists()) {
+                            trips.value = docSnap.data().trips;
+                            if (trips.value.length > 0) {
+                                currentTripId.value = trips.value[0].id;
+                                selectedDate.value = trips.value[0].dates[0];
+                            }
+                        } else {
+                            trips.value = [{
+                                id: 1, name: '2026 釜山之旅 🇰🇷', dates:['5/13', '5/14', '5/15'], exchangeRate: 0.0235, people:['自己', '旅伴'], expenses:[],
+                                weather: { '5/13': { type: '晴天', tempLow: 18, tempHigh: 24, rainChance: 10 } },
+                                itinerary:[]
+                            }];
+                            currentTripId.value = 1;
+                            selectedDate.value = '5/13';
+                        }
+                    } catch (e) { console.error(e); } finally { isLoading.value = false; }
+                };
+
+                onMounted(() => {
+                    const checkDB = setInterval(() => {
+                        if (window.db) { clearInterval(checkDB); loadFromCloud(); }
+                    }, 100);
+                });
+
+                watch(trips, () => { saveToCloud(); }, { deep: true });
+
+                const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
+                const currentDayWeather = computed(() => (currentTrip.value?.weather?.[selectedDate.value]) || null);
+                const getWeatherIcon = (type) => type?.includes('雨') ? 'fa-solid fa-cloud-showers-heavy' : (type?.includes('雲') ? 'fa-solid fa-cloud-sun' : 'fa-solid fa-sun');
+                
+                const selectTrip = (id) => {
+                    currentTripId.value = id;
+                    selectedDate.value = currentTrip.value.dates[0];
+                    isSidebarOpen.value = false;
+                };
+
+                const isAddTripModalOpen = ref(false);
+                const newTripForm = reactive({ name: '', startDate: '', endDate: '' });
+                const openAddTripModal = () => { isAddTripModalOpen.value = true; };
+                const createNewTrip = () => {
+                    let dates =[]; let curr = new Date(newTripForm.startDate); let end = new Date(newTripForm.endDate);
+                    while(curr <= end) { dates.push(`${curr.getMonth()+1}/${curr.getDate()}`); curr.setDate(curr.getDate() + 1); }
+                    const newId = Date.now();
+                    trips.value.push({ id: newId, name: newTripForm.name, dates, exchangeRate: 1, people:['自己', '旅伴'], expenses:[], itinerary:[], weather:{} });
+                    selectTrip(newId); isAddTripModalOpen.value = false;
+                };
+
+                const currentDayItinerary = computed({
+                    get() { return (currentTrip.value?.itinerary || []).filter(i => i.date === selectedDate.value).sort((a, b) => a.order - b.order); },
+                    set(newList) {
+                        newList.forEach((item, index) => { item.order = index; });
+                        const others = currentTrip.value.itinerary.filter(i => i.date !== selectedDate.value);
+                        currentTrip.value.itinerary = [...others, ...newList];
+                    }
+                });
+
+                const isModalOpen = ref(false);
+                const modalMode = ref('add');
+                const form = reactive({ id: null, date: '', time: '', type: 'normal', title: '', googleMapUrl: '', lat: null, lng: null, remark: '' });
+                const openAddModal = () => {
+                    modalMode.value = 'add';
+                    Object.assign(form, { id: Date.now(), date: selectedDate.value, time: '10:00', type: 'normal', title: '', googleMapUrl: '', lat: null, lng: null, remark: '' });
+                    isModalOpen.value = true;
+                };
+                const openEditModal = (item) => { modalMode.value = 'edit'; Object.assign(form, item); isModalOpen.value = true; };
+                const closeModal = () => { isModalOpen.value = false; };
+                const saveItinerary = () => {
+                    if (modalMode.value === 'add') currentTrip.value.itinerary.push({ ...form, order: currentDayItinerary.value.length });
+                    else {
+                        const idx = currentTrip.value.itinerary.findIndex(i => i.id === form.id);
+                        currentTrip.value.itinerary[idx] = { ...form };
+                    }
+                    closeModal();
+                };
+                const deleteItinerary = (id) => { currentTrip.value.itinerary = currentTrip.value.itinerary.filter(i => i.id !== id); closeModal(); };
+
+                // 地圖與分帳邏輯 (保持原有邏輯)
+                let map = null, markers = null;
+                const initMap = () => {
+                    if (map) return;
+                    map = L.map('leaflet-map', { zoomControl: false }).setView([35.1524, 129.0596], 13);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+                    markers = L.layerGroup().addTo(map);
+                };
+                const updateMarkers = () => {
+                    if (!markers) return; markers.clearLayers();
+                    const pts = [];
+                    currentDayItinerary.value.forEach(i => { if (i.lat) { L.marker([i.lat, i.lng]).addTo(markers).bindPopup(i.title); pts.push([i.lat, i.lng]); } });
+                    if (pts.length) map.fitBounds(pts, { padding: [50, 50] });
+                };
+                watch(currentTab, async (t) => { if (t === 'map') { await nextTick(); initMap(); map.invalidateSize(); updateMarkers(); } });
+
+                const newExpense = reactive({ item: '', amount: null, paidBy: '自己' });
+                const addExpense = () => { if (!newExpense.amount) return; currentTrip.value.expenses.push({ id: Date.now(), ...newExpense }); newExpense.item = ''; newExpense.amount = null; };
+                const deleteExpense = (id) => { currentTrip.value.expenses = currentTrip.value.expenses.filter(e => e.id !== id); };
+                const settlements = computed(() => {
+                    if (!currentTrip.value) return [];
+                    const bal = {}; currentTrip.value.people.forEach(p => bal[p] = 0);
+                    currentTrip.value.expenses.forEach(e => {
+                        bal[e.paidBy] += e.amount;
+                        const share = e.amount / currentTrip.value.people.length;
+                        currentTrip.value.people.forEach(p => bal[p] -= share);
+                    });
+                    const res = [];
+                    const debtors = Object.entries(bal).filter(x => x[1] < -1).map(x => ({p:x[0], b:Math.abs(x[1])}));
+                    const creditors = Object.entries(bal).filter(x => x[1] > 1).map(x => ({p:x[0], b:x[1]}));
+                    let d=0, c=0;
+                    while(d<debtors.length && c<creditors.length) {
+                        let amt = Math.min(debtors[d].b, creditors[c].b);
+                        res.push({ from: debtors[d].p, to: creditors[c].p, amount: Math.round(amt) });
+                        debtors[d].b -= amt; creditors[c].b -= amt;
+                        if(debtors[d].b < 1) d++; if(creditors[c].b < 1) c++;
+                    }
+                    return res;
+                });
+
+                return {
+                    isLoading, currentTab, tabs, isSidebarOpen, trips, currentTripId, currentTrip, selectTrip,
+                    isAddTripModalOpen, newTripForm, openAddTripModal, createNewTrip, selectedDate,
+                    currentDayItinerary, isModalOpen, modalMode, form, openAddModal, openEditModal, closeModal, saveItinerary, deleteItinerary,
+                    newExpense, addExpense, deleteExpense, settlements, currentDayWeather, getWeatherIcon
+                };
+            }
+        });
+
+        app.component('draggable', window.vuedraggable);
+        app.mount('#app');
+    </script>
+</body>
+</html>

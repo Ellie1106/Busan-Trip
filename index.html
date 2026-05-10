@@ -114,7 +114,7 @@
       100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
     }
 
-    /* 參考範例：使用者定位點閃爍動畫 */
+    /* 使用者定位點閃爍動畫 */
     .gps-pulse {
         width: 14px; height: 14px; border: 2px solid #fff; border-radius: 50%;
         background-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4);
@@ -185,17 +185,20 @@
       </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto no-scrollbar relative" v-if="currentTrip">
-      <!-- Tab 1: 行程表 -->
-      <div v-show="currentTab === 'itinerary'" class="p-4 pb-20">
-        <!-- 日期選擇器 -->
-        <div class="flex overflow-x-auto no-scrollbar mb-4 py-1 gap-2 snap-x">
+    <main class="flex-1 flex flex-col overflow-hidden relative" v-if="currentTrip">
+      
+      <!-- 共用的日期選擇器 -->
+      <div v-show="currentTab === 'itinerary' || currentTab === 'map'" class="shrink-0 px-4 pt-4 pb-2 bg-[#f9f6f0] z-20 shadow-sm border-b border-[#e8e2d9]/50">
+        <div class="flex overflow-x-auto no-scrollbar gap-2 snap-x">
           <button v-for="(date, index) in currentTrip.dates" :key="date" @click="selectedDate = date" class="flex-none w-16 h-14 rounded-xl text-xs font-bold transition-all shadow-sm flex flex-col items-center justify-center snap-center border" :class="selectedDate === date ? 'bg-primary-light text-white scale-105 border-primary-light' : 'bg-white text-[#8c7a6b] border-[#e8e2d9]'">
             <span class="text-[9px] font-normal mb-0.5 opacity-80">Day {{ index + 1 }}</span>
             {{ date }}
           </button>
         </div>
+      </div>
 
+      <!-- Tab 1: 行程表 -->
+      <div v-show="currentTab === 'itinerary'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 relative">
         <!-- 氣象資訊卡 -->
         <div v-if="weatherLoading" class="bg-white/50 border border-dashed border-[#e8e2d9] rounded-xl p-4 mb-4 flex items-center justify-center space-x-2">
           <i class="fa-solid fa-spinner fa-spin text-primary text-xs"></i>
@@ -231,6 +234,7 @@
           <draggable v-model="currentDayItinerary" item-key="id" handle=".drag-handle" ghost-class="sortable-ghost" :animation="200">
             <template #item="{ element: item, index }">
               <div class="relative pl-5 mb-8">
+                <!-- 時間軸圓點 -->
                 <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10"></div>
 
                 <div :class="item.type === 'flight' ? 'bg-primary text-white border border-primary-light shadow-md p-2' : 'bg-white border border-[#e8e2d9] text-[#4a4036] p-3.5'" class="rounded-xl shadow-sm relative overflow-hidden">
@@ -242,7 +246,6 @@
                       </span>
                     </div>
                     <div class="flex space-x-3 items-center">
-                      <!-- ★ 導航按鈕 ★ -->
                       <button v-if="item.type !== 'flight' && (item.title || item.googleMapUrl || (item.lat && item.lng))" @click="startNavigation(item)" title="開始導航" class="bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 h-7 rounded flex items-center justify-center font-bold shadow-sm transition-colors btn-nav-pulse gap-1.5">
                         <i class="fa-solid fa-diamond-turn-right text-[11px]"></i>
                         <span class="text-[10px] leading-none tracking-wider">導航</span>
@@ -256,16 +259,25 @@
                   </div>
 
                   <h3 class="font-bold relative z-10" :class="item.type === 'flight' ? 'text-xs mt-0.5' : 'text-sm'">{{ item.title }}</h3>
-                  <p v-if="item.remark" :class="item.type === 'flight' ? 'bg-black/10 text-white/80 p-1.5 mt-1.5 text-[9px]' : 'bg-[#f9f6f0] text-[#8c7a6b] p-2 mt-2 text-[10px]'" class="rounded-lg font-medium relative z-10">
+                  
+                  <!-- 航班 去程目的地 UI -->
+                  <div v-if="item.type === 'flight' && (item.flightDep || item.flightDest)" class="mt-2 flex items-center text-[11px] font-bold text-white/95 bg-black/20 w-fit px-2.5 py-1 rounded-lg relative z-10 shadow-inner">
+                    <span>{{ item.flightDep || '出發地' }}</span>
+                    <i class="fa-solid fa-plane text-[10px] mx-2 opacity-70"></i>
+                    <span>{{ item.flightDest || '目的地' }}</span>
+                  </div>
+
+                  <p v-if="item.remark" :class="item.type === 'flight' ? 'bg-black/10 text-white/80 p-1.5 mt-1.5 text-[9px]' : 'bg-[#f9f6f0] text-[#8c7a6b] p-2 mt-2 text-[10px]'" class="rounded-lg font-medium relative z-10 whitespace-pre-wrap">
                     {{ item.remark }}
                   </p>
                 </div>
 
-                <!-- 移動時間 -->
-                <div v-if="index < currentDayItinerary.length - 1 && item.transitTime" class="absolute -bottom-6 left-[-15px] z-10 flex items-center bg-[#f9f6f0] py-1">
-                  <div class="border border-[#e8e2d9] rounded-full px-3 py-0.5 text-[10px] flex items-center bg-white shadow-sm font-bold text-primary">
-                    <i class="fa-solid fa-car-side mr-1.5"></i>
-                    {{ item.transitTime }}
+                <!-- 預估移動時間 UI (已去除底板) -->
+                <div v-if="index < currentDayItinerary.length - 1 && item.transitTime" class="absolute -bottom-[22px] left-[-6px] z-10 flex items-center py-1">
+                  <div class="text-[10px] flex items-center font-bold text-[#8c7a6b] bg-transparent">
+                    <i class="fa-solid fa-arrow-down mr-1.5 opacity-60"></i>
+                    <i class="fa-solid fa-car-side mr-1.5 text-primary"></i>
+                    <span class="opacity-90 tracking-wide">{{ item.transitTime }}</span>
                   </div>
                 </div>
               </div>
@@ -280,8 +292,7 @@
       </div>
 
       <!-- Tab 2: 地圖模式 -->
-      <div v-show="currentTab === 'map'" class="h-full w-full relative">
-        <!-- 參考範例：地圖載入覆蓋層 -->
+      <div v-show="currentTab === 'map'" class="flex-1 w-full relative">
         <div v-if="isMapLoading" class="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-primary">
             <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
             <span class="text-xs font-bold">{{ mapStatusText }}</span>
@@ -289,24 +300,20 @@
 
         <div id="leaflet-map" class="w-full h-full z-0"></div>
         
-        <!-- 地圖工具列 -->
         <div class="absolute top-3 left-3 right-3 bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-lg z-[400] border border-[#e8e2d9]">
           <div class="flex justify-between items-center">
             <div>
               <h3 class="font-bold text-[#4a4036] text-xs"><i class="fa-solid fa-location-dot text-primary mr-2"></i>Day {{ currentTrip.dates.indexOf(selectedDate) + 1 }} 景點分布</h3>
-              <p class="text-[9px] text-[#8c7a6b] mt-0.5">{{ selectedDate }}</p>
             </div>
-            <!-- 修改為：回到使用者中心點 -->
             <button @click="centerOnUser" class="bg-primary text-white text-[10px] px-4 py-2 rounded-lg active:scale-95 shadow-md flex items-center">
               <i class="fa-solid fa-crosshairs mr-1.5"></i> 定位
             </button>
           </div>
         </div>
-
       </div>
 
       <!-- Tab 3: 分帳模式 -->
-      <div v-show="currentTab === 'split'" class="p-4 pb-20 space-y-5">
+      <div v-show="currentTab === 'split'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-5">
         <div class="bg-white p-4 rounded-xl shadow-sm border border-[#e8e2d9] flex justify-between items-center">
           <div class="flex items-center gap-2">
             <i class="fa-solid fa-coins text-primary"></i>
@@ -314,7 +321,6 @@
           </div>
           <input v-model.number="currentTrip.exchangeRate" type="number" step="0.001" class="w-1/3 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-xs font-mono text-right">
         </div>
-        <!-- 結算 -->
         <div class="bg-primary rounded-xl p-4 text-white shadow-md">
           <h3 class="text-sm font-bold mb-3 border-b border-white/20 pb-2">結算清單 (台幣)</h3>
           <ul class="space-y-2">
@@ -325,7 +331,6 @@
             <li v-if="settlements.length === 0" class="text-xs text-white/50 text-center py-2 italic">尚無支出紀錄</li>
           </ul>
         </div>
-        <!-- 記帳表單 -->
         <div class="bg-white p-4 rounded-xl shadow-sm border border-[#e8e2d9]">
           <h3 class="text-xs font-bold text-[#4a4036] mb-3 uppercase tracking-wider">新增一筆花費</h3>
           <div class="space-y-2">
@@ -344,7 +349,6 @@
             <button @click="addExpense" class="w-full bg-primary text-white rounded-lg py-2.5 font-bold text-xs mt-1">加入記帳</button>
           </div>
         </div>
-        <!-- 歷史支出 -->
         <div class="space-y-2">
           <div v-for="exp in currentTrip.expenses" :key="exp.id" class="bg-white p-3 rounded-lg shadow-sm border border-[#e8e2d9] flex justify-between items-center">
             <div>
@@ -405,19 +409,33 @@
               <input v-model="form.time" type="time" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
             </div>
           </div>
+          
+          <div v-if="form.type === 'flight'" class="flex gap-3">
+            <div class="w-1/2">
+              <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest">去程 (出發地)</label>
+              <input v-model="form.flightDep" type="text" placeholder="例如：台北 (TPE)" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
+            </div>
+            <div class="w-1/2">
+              <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest">目的地</label>
+              <input v-model="form.flightDest" type="text" placeholder="例如：東京 (NRT)" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
+            </div>
+          </div>
+
           <div>
-            <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest">標題</label>
+            <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest">{{ form.type === 'flight' ? '航班號碼/標題' : '標題' }}</label>
             <input v-model="form.title" type="text" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
           </div>
-          <div>
+          
+          <div v-if="form.type === 'normal'">
             <label class="text-[10px] text-primary font-bold uppercase flex items-center">
               <i class="fa-solid fa-car-side mr-1"></i> 下個行程預估移動時間
             </label>
             <input v-model="form.transitTime" type="text" placeholder="例如：步行 15 分鐘 / 自駕 20 分鐘" class="w-full bg-white border border-primary/30 rounded-lg px-3 py-2 text-xs mt-1 focus:border-primary outline-none">
           </div>
+
           <div v-if="form.type === 'normal'">
             <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest flex items-center">
-              Google Map 網址 <span class="ml-2 text-[8px] text-blue-400 font-normal">支援長短網址，助於精準定位</span>
+              Google Map 網址 <span class="ml-2 text-[8px] text-blue-400 font-normal">填寫網址才會顯示在地圖上</span>
             </label>
             <input v-model="form.googleMapUrl" type="url" placeholder="https://maps.app.goo.gl/... 或 https://www.google.com/maps/..." class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-[10px] mt-1 text-blue-600">
           </div>
@@ -508,21 +526,26 @@
         const selectedDate = ref('');
         const tripToDelete = ref(null);
 
-        // --- Firebase 同步 ---
+        let syncTimeout = null;
         const saveToCloud = async () => {
           if (isLoading.value) return;
-          isSyncing.value = true;
-          try {
-            await setDoc(doc(window.db, "appData", "user_trips"), {
-              trips: JSON.parse(JSON.stringify(trips.value)),
-              lastUpdate: new Date().getTime()
-            });
-          } catch (e) {
-            console.error("Save error:", e);
-          } finally {
-            setTimeout(() => isSyncing.value = false, 500);
-          }
+          
+          clearTimeout(syncTimeout);
+          syncTimeout = setTimeout(async () => {
+            isSyncing.value = true;
+            try {
+              await setDoc(doc(window.db, "appData", "user_trips"), {
+                trips: JSON.parse(JSON.stringify(trips.value)),
+                lastUpdate: new Date().getTime()
+              });
+            } catch (e) {
+              console.error("Save error:", e);
+            } finally {
+              setTimeout(() => isSyncing.value = false, 500);
+            }
+          }, 1500); 
         };
+
         const loadFromCloud = async () => {
           isLoading.value = true;
           try {
@@ -554,12 +577,10 @@
           saveToCloud();
         }, { deep: true });
 
-        // --- ★ 開啟 CWA 中央氣象署快捷功能 ★ ---
         const openCWAWeather = () => {
             window.open('https://www.cwa.gov.tw/V8/C/W/world.html', '_blank');
         };
 
-        // --- ★ 氣象預報功能 (強制綁定第一天航班，對齊 CWA 分類) ★ ---
         const detectLocation = () => {
           if (!currentTrip.value || !currentTrip.value.dates || currentTrip.value.dates.length === 0) return null;
           
@@ -570,12 +591,12 @@
           if (flight) {
               if (flight.lat && flight.lng) {
                   return {
-                      name: flight.title.replace(/飛往|抵達|航班|到|航空|乘|坐/g, '').trim() || '目的地',
+                      name: flight.flightDest || flight.title.replace(/飛往|抵達|航班|到|航空|乘|坐/g, '').trim() || '目的地',
                       lat: flight.lat,
                       lng: flight.lng
                   };
               }
-              return { name: flight.title.replace(/飛往|抵達|航班|到|航空|乘|坐/g, '').trim() };
+              return { name: flight.flightDest || flight.title.replace(/飛往|抵達|航班|到|航空|乘|坐/g, '').trim() };
           }
           
           const firstItem = firstDayItinerary[0];
@@ -667,7 +688,6 @@
           }
         };
 
-        // --- 旅程管理 ---
         const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
         const currentDayWeather = computed(() => currentTrip.value?.weather?.[selectedDate.value]);
         const selectTrip = (id) => {
@@ -709,7 +729,6 @@
           isAddTripModalOpen.value = false;
         };
 
-        // --- 行程資料處理 ---
         const currentDayItinerary = computed({
           get() {
             return (currentTrip.value?.itinerary ||[]).filter(i => i.date === selectedDate.value).sort((a, b) => a.order - b.order);
@@ -723,7 +742,7 @@
         const isModalOpen = ref(false);
         const modalMode = ref('add');
         const form = reactive({
-          id: null, date: '', time: '', type: 'normal', title: '', googleMapUrl: '', lat: null, lng: null, remark: '', transitTime: ''
+          id: null, date: '', time: '', type: 'normal', title: '', flightDep: '', flightDest: '', googleMapUrl: '', lat: null, lng: null, remark: '', transitTime: ''
         });
         
         const parseMapUrl = async (url) => {
@@ -768,7 +787,7 @@
 
         const openAddModal = () => {
           modalMode.value = 'add';
-          Object.assign(form, { id: Date.now(), date: selectedDate.value, time: '10:00', type: 'normal', title: '', googleMapUrl: '', lat: null, lng: null, remark: '', transitTime: '' });
+          Object.assign(form, { id: Date.now(), date: selectedDate.value, time: '10:00', type: 'normal', title: '', flightDep: '', flightDest: '', googleMapUrl: '', lat: null, lng: null, remark: '', transitTime: '' });
           isModalOpen.value = true;
         };
         const openEditModal = (item) => {
@@ -778,25 +797,55 @@
         };
         const closeModal = () => { isModalOpen.value = false; };
         
-        const saveItinerary = async () => {
-          loadingText.value = "正在解析 Google Map 網址座標...";
-          isLoading.value = true;
+        const saveItinerary = () => {
+          const isAdd = modalMode.value === 'add';
+          const targetItem = { ...form };
+          const currentUrl = form.googleMapUrl;
+          const originalUrl = modalMode.value === 'edit' ? currentTrip.value.itinerary.find(i => i.id === form.id)?.googleMapUrl : '';
+          
+          // 如果網址被修改，先清除舊的經緯度以利後台重新抓取
+          if (currentUrl && currentUrl !== originalUrl) {
+              targetItem.lat = null;
+              targetItem.lng = null;
+          }
 
-          const coords = await parseMapUrl(form.googleMapUrl);
-          form.lat = coords.lat;
-          form.lng = coords.lng;
-
-          if (modalMode.value === 'add') {
-            currentTrip.value.itinerary.push({ ...form, order: currentDayItinerary.value.length });
+          if (isAdd) {
+            targetItem.order = currentDayItinerary.value.length;
+            currentTrip.value.itinerary.push(targetItem);
           } else {
             const idx = currentTrip.value.itinerary.findIndex(i => i.id === form.id);
-            if (idx !== -1) currentTrip.value.itinerary[idx] = { ...form };
+            if (idx !== -1) currentTrip.value.itinerary[idx] = targetItem;
           }
+          
+          // 瞬間關閉視窗，不影響使用者操作體驗
           closeModal();
           updateAllWeather();
           
-          isLoading.value = false;
-          loadingText.value = "正在同步旅程與資訊..."; 
+          // 背景偷偷執行座標解析（不卡頓）
+          if (currentUrl && currentUrl !== originalUrl) {
+              parseMapUrl(currentUrl).then(coords => {
+                  if (coords.lat && coords.lng) {
+                      const trip = trips.value.find(t => t.id === currentTripId.value);
+                      if (trip) {
+                          const item = trip.itinerary.find(i => i.id === targetItem.id);
+                          if (item) {
+                              item.lat = coords.lat;
+                              item.lng = coords.lng;
+                          }
+                      }
+                  }
+              });
+          } else if (!currentUrl && originalUrl) {
+              // 如果使用者把原本的網址清空，則清空座標
+              const trip = trips.value.find(t => t.id === currentTripId.value);
+              if (trip) {
+                  const item = trip.itinerary.find(i => i.id === targetItem.id);
+                  if (item) {
+                      item.lat = null;
+                      item.lng = null;
+                  }
+              }
+          }
         };
         
         const deleteItinerary = (id) => {
@@ -815,22 +864,26 @@
           }
         };
 
-        // --- ★ 地圖核心邏輯 (完全仿造參考範例與優先 Google Map 解析) ★ ---
+        // --- 地圖核心邏輯 ---
         const isMapLoading = ref(false);
         const mapStatusText = ref('');
         let map = null, markersLayer = null, routeLine = null, userMarker = null;
         let geoWatchId = null;
+        let mapRenderId = 0; 
 
-        const getNumberedIcon = (num) => L.divIcon({
+        // 改用 Logo 圖示作為地標，不再使用數字排序
+        const getLogoIcon = () => L.divIcon({
             className: 'dummy',
-            html: `<div style="background-color: #ef4444; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); font-size: 12px; margin-top: -12px; margin-left: -12px;">${num}</div>`,
+            html: `<div style="color: #ea4335; font-size: 28px; text-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-top: -28px; margin-left: -10px; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-location-dot"></i></div>`,
             iconSize:[0, 0]
         });
 
         const initMap = async () => {
             isMapLoading.value = true;
-            mapStatusText.value = "正在載入地圖資訊...";
+            mapStatusText.value = "正在繪製地圖標記...";
             await nextTick();
+            
+            const currentRenderId = ++mapRenderId; 
             
             if (map) { map.remove(); map = null; markersLayer = null; userMarker = null; }
             map = L.map('leaflet-map', { zoomControl: false }).setView([25.033, 121.565], 13);
@@ -839,7 +892,6 @@
             }).addTo(map);
             markersLayer = L.layerGroup().addTo(map);
 
-            // 啟用使用者持續定位追蹤 (仿照範例)
             if ("geolocation" in navigator) {
                 if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
                 geoWatchId = navigator.geolocation.watchPosition(
@@ -849,7 +901,6 @@
                         if (userMarker) {
                             userMarker.setLatLng([lat, lng]);
                         } else {
-                            // 採用範例的持續閃爍藍點 CSS 動畫圖標
                             const icon = L.divIcon({ 
                                 className: 'custom-div-icon', 
                                 html: "<div class='gps-pulse' style='margin-left: -7px; margin-top: -7px;'></div>", 
@@ -864,61 +915,40 @@
                 );
             }
 
-            // 仿造範例：結合已知座標與未有座標的 Nominatim 自動遞迴尋找機制
             const bounds = L.latLngBounds();
             const routePts =[];
-            let pointIndex = 1;
             
-            const targetItems = currentDayItinerary.value.filter(i => i.type !== 'flight');
+            // 嚴格比照：「只有填入 googleMapUrl 的行程才會在地圖上釘選標記」
+            const targetItems = currentDayItinerary.value.filter(i => i.type !== 'flight' && i.googleMapUrl);
 
             for (const item of targetItems) {
+                if (currentRenderId !== mapRenderId) return;
+                
                 let lat = item.lat;
                 let lng = item.lng;
 
-                // 若該景點沒網址座標，仿照範例向 Nominatim 詢問 (每次延遲 500ms 避免鎖 IP)
-                if (!lat || !lng) {
-                    if (item.title) {
-                        try {
-                            mapStatusText.value = `正在搜尋景點：${item.title}...`;
-                            await new Promise(r => setTimeout(r, 500));
-                            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(item.title)}&limit=1`);
-                            const d = await res.json();
-                            if (d && d.length > 0) {
-                                lat = parseFloat(d[0].lat);
-                                lng = parseFloat(d[0].lon);
-                                // 將搜尋到的結果儲存回去，下次不用再搜
-                                item.lat = lat;
-                                item.lng = lng;
-                            }
-                        } catch (e) {}
-                    }
-                }
-
                 if (lat && lng) {
-                    const marker = L.marker([lat, lng], { icon: getNumberedIcon(pointIndex) }).addTo(markersLayer);
+                    const marker = L.marker([lat, lng], { icon: getLogoIcon() }).addTo(markersLayer);
                     const navUrl = item.googleMapUrl ? item.googleMapUrl : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
                     marker.bindPopup(`<div class="p-1"><div class="font-bold text-xs mb-1">${item.title}</div><div class="text-[10px] text-gray-500 mb-2">${item.time}</div><a href="${navUrl}" target="_blank" class="bg-blue-500 text-white px-2 py-1 rounded text-[10px] block text-center font-bold no-underline">開啟導航</a></div>`);
                     
                     routePts.push([lat, lng]);
                     bounds.extend([lat, lng]);
-                    pointIndex++;
                 }
             }
 
-            if (routePts.length > 1) {
-                routeLine = L.polyline(routePts, { color: '#3b82f6', weight: 4, dashArray: '6, 6', opacity: 0.8 }).addTo(map);
-            }
-
-            isMapLoading.value = false;
-            mapStatusText.value = '';
-
-            // 自動適應畫面
-            if (routePts.length > 0) {
-                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            if (currentRenderId === mapRenderId) {
+                if (routePts.length > 1) {
+                    routeLine = L.polyline(routePts, { color: '#3b82f6', weight: 4, dashArray: '6, 6', opacity: 0.8 }).addTo(map);
+                }
+                if (routePts.length > 0) {
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                }
+                isMapLoading.value = false;
+                mapStatusText.value = '';
             }
         };
 
-        // 對焦回到使用者中心點
         const centerOnUser = () => {
             if (!navigator.geolocation) {
                 alert("您的瀏覽器不支援定位功能");
@@ -931,9 +961,14 @@
             }
         };
 
-        watch([currentTab, selectedDate], async ([tab]) => {
-          if (tab === 'map') {
+        watch([currentTab, selectedDate], async ([newTab]) => {
+          if (newTab === 'map') {
             await initMap();
+          } else {
+            if (geoWatchId !== null) {
+              navigator.geolocation.clearWatch(geoWatchId);
+              geoWatchId = null;
+            }
           }
         });
 

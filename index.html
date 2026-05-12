@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-title" content="TripApp">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <link rel="apple-touch-icon" href="https://api.dicebear.com/7.x/initials/svg?seed=TripApp&backgroundColor=6a5a4e&fontSize=35&fontWeight=700&fontFamily=Arial&chars=1">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://api.dicebear.com/7.x/initials/svg?seed=TripApp&backgroundColor=6a5a4e&fontSize=35&fontWeight=700&fontFamily=Arial&chars=1">
+  <!-- 更換為旅行箱的 Icon -->
+  <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/200/luggage.png">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/color/200/luggage.png">
 
-  <link rel="apple-touch-icon" href="https://img.icons8.com/plasticine/200/airplane-take-off.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -52,9 +52,6 @@
     .leaflet-control-container { z-index: 10; }
     .btn-nav-pulse { animation: pulse-blue 2s infinite; }
     @keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
-    .gps-pulse { width: 14px; height: 14px; border: 2px solid #fff; border-radius: 50%; background-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4); animation: pulse-blue-gps 2s infinite; }
-    @keyframes pulse-blue-gps { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
-    .custom-div-icon { background: transparent; border: none; }
   </style>
 </head>
 
@@ -69,7 +66,7 @@
 
     <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-[#4a4036]/40 z-[500] backdrop-blur-sm transition-opacity"></div>
     <div :class="isSidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed top-0 left-0 h-full w-64 bg-[#f9f6f0] z-[600] transition-transform duration-300 shadow-2xl flex flex-col">
-      <div class="p-5 bg-primary text-white">
+      <div class="p-5 bg-primary text-white" style="padding-top: max(1.25rem, env(safe-area-inset-top));">
         <h2 class="text-lg font-bold tracking-widest"><i class="fa-solid fa-suitcase-rolling mr-2"></i>我的旅程</h2>
       </div>
       <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
@@ -92,7 +89,8 @@
       </div>
     </div>
 
-    <header class="bg-primary text-[#f9f6f0] pt-8 pb-3 px-5 rounded-b-2xl shadow-md z-20 shrink-0 flex items-center justify-between">
+    <!-- 調整：增加整體介面的 padding-top 讓畫面往下移 -->
+    <header class="bg-primary text-[#f9f6f0] pb-3 px-5 rounded-b-2xl shadow-md z-20 shrink-0 flex items-center justify-between" style="padding-top: max(3rem, env(safe-area-inset-top));">
       <div class="flex items-center gap-3">
         <button @click="isSidebarOpen = true" class="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center text-lg transition-colors">
           <i class="fa-solid fa-bars"></i>
@@ -172,7 +170,8 @@
                     <i class="fa-solid fa-plane text-[10px] mx-2 opacity-70"></i>
                     <span>{{ item.flightDest || '目的地' }}</span>
                   </div>
-                  <p v-if="item.remark" :class="item.type === 'flight' ? 'bg-black/10 text-white/80 p-1.5 mt-1.5 text-[9px]' : 'bg-[#f9f6f0] text-[#8c7a6b] p-2 mt-2 text-[10px]'" class="rounded-lg font-medium relative z-10 whitespace-pre-wrap">{{ item.remark }}</p>
+                  <!-- 調整：備註字體放大、增加 padding -->
+                  <p v-if="item.remark" :class="item.type === 'flight' ? 'bg-black/10 text-white/90 p-2 mt-1.5 text-xs' : 'bg-[#f9f6f0] text-[#4a4036] p-3 mt-2 text-sm leading-relaxed'" class="rounded-lg font-medium relative z-10 whitespace-pre-wrap">{{ item.remark }}</p>
                 </div>
                 <div v-if="index < currentDayItinerary.length - 1 && item.transitTime" class="absolute -bottom-[22px] left-[-6px] z-10 flex items-center py-1">
                   <div class="text-[10px] flex items-center font-bold text-[#8c7a6b] bg-transparent">
@@ -210,7 +209,7 @@
       </div>
 
       <div v-show="currentTab === 'checklist'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-4">
-        <div v-for="cat in ['文件', '行李']" :key="cat" class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
+        <div v-for="cat in['文件', '行李']" :key="cat" class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
           <div class="bg-[#eae5dc] px-4 py-2 text-xs font-bold text-primary flex items-center">
             <i :class="cat === '文件' ? 'fa-solid fa-file-invoice' : 'fa-solid fa-suitcase'" class="mr-2"></i> {{ cat }}
           </div>
@@ -246,26 +245,39 @@
               <span>{{ settlement.from }} ➔ {{ settlement.to }}</span>
               <span class="font-mono font-bold">NT$ {{ settlement.amount.toLocaleString() }}</span>
             </li>
-            <li v-if="settlements.length === 0" class="text-xs text-white/50 text-center py-2 italic">尚無支出紀錄</li>
+            <li v-if="settlements.length === 0" class="text-xs text-white/50 text-center py-2 italic">尚無支出互相欠款紀錄</li>
           </ul>
         </div>
         <div class="bg-white p-4 rounded-xl shadow-sm border border-[#e8e2d9]">
           <h3 class="text-xs font-bold text-[#4a4036] mb-3 uppercase tracking-wider">新增一筆花費</h3>
           <div class="space-y-2">
             <input v-model="newExpense.item" type="text" placeholder="項目 (例如：午餐、車票)" class="w-full bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs">
-            <div class="flex gap-2">
-              <div class="w-2/3 relative flex items-center">
-                <input v-model.number="newExpense.amount" type="number" placeholder="外幣金額" class="w-full bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg pl-3 pr-[4.5rem] py-2 text-xs font-mono">
-                <span v-if="newExpense.amount && currentTrip.exchangeRate" class="absolute right-3 text-[10px] text-[#8c7a6b] font-mono pointer-events-none">
-                  ≈ NT$ {{ Math.round(newExpense.amount * currentTrip.exchangeRate).toLocaleString() }}
-                </span>
-              </div>
-              <select v-model="newExpense.paidBy" class="w-1/3 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-2 py-2 text-[10px]">
-                <option v-for="person in currentTrip.people" :value="person">{{ person }}</option>
-              </select>
+            <div class="relative flex items-center">
+              <input v-model.number="newExpense.amount" type="number" placeholder="外幣金額" class="w-full bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg pl-3 pr-[4.5rem] py-2 text-xs font-mono">
+              <span v-if="newExpense.amount && currentTrip.exchangeRate" class="absolute right-3 text-[10px] text-[#8c7a6b] font-mono pointer-events-none">
+                ≈ NT$ {{ Math.round(newExpense.amount * currentTrip.exchangeRate).toLocaleString() }}
+              </span>
             </div>
+            
+            <!-- 調整：分帳升級，加入「為誰付」選項 -->
             <div class="flex gap-2">
-              <div class="w-full flex items-center bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-2">
+              <div class="w-1/2 flex items-center bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-2 py-1.5">
+                <span class="text-[10px] text-[#8c7a6b] font-bold mr-1.5 whitespace-nowrap">付款人:</span>
+                <select v-model="newExpense.paidBy" class="flex-1 bg-transparent text-[10px] outline-none w-full">
+                  <option v-for="person in currentTrip.people" :value="person">{{ person }}</option>
+                </select>
+              </div>
+              <div class="w-1/2 flex items-center bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-2 py-1.5">
+                <span class="text-[10px] text-[#8c7a6b] font-bold mr-1.5 whitespace-nowrap">為誰付:</span>
+                <select v-model="newExpense.forWhom" class="flex-1 bg-transparent text-[10px] outline-none w-full">
+                  <option value="所有人">大家(平分)</option>
+                  <option v-for="person in currentTrip.people" :value="person">{{ person }}(個人)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <div class="w-full flex items-center bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-2 py-1.5">
                 <span class="text-[10px] text-[#8c7a6b] font-bold mr-2">退稅狀態:</span>
                 <select v-model="newExpense.taxStatus" class="flex-1 bg-transparent text-[10px] outline-none">
                   <option value="無">無</option>
@@ -287,7 +299,11 @@
                   {{ exp.taxStatus }}
                 </span>
               </div>
-              <p class="text-[9px] text-[#8c7a6b]">{{ exp.paidBy }} 付款</p>
+              <p class="text-[9px] text-[#8c7a6b] mt-0.5">
+                {{ exp.paidBy }} 付款 
+                <span v-if="exp.forWhom && exp.forWhom !== '所有人'"><i class="fa-solid fa-caret-right mx-1 text-[#dcd3cb]"></i>代墊給 {{ exp.forWhom }}</span>
+                <span v-else><i class="fa-solid fa-caret-right mx-1 text-[#dcd3cb]"></i>大家平分</span>
+              </p>
             </div>
             <div class="flex items-center gap-3">
               <div class="text-right">
@@ -372,7 +388,7 @@
           </div>
           <div>
             <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest">備註 / 資訊</label>
-            <textarea v-model="form.remark" rows="2" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1"></textarea>
+            <textarea v-model="form.remark" rows="3" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1"></textarea>
           </div>
           <button @click="saveItinerary" class="w-full bg-primary text-white rounded-lg py-3 font-bold text-sm active:scale-95">儲存行程</button>
           <button v-if="modalMode === 'edit'" @click="deleteItinerary(form.id)" class="w-full text-red-500 font-bold text-xs py-2">刪除此行程</button>
@@ -450,7 +466,7 @@
         const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
 
         const currentDayItinerary = computed({
-          get: () => currentTrip.value?.itinerary.filter(i => i.date === selectedDate.value) || [],
+          get: () => currentTrip.value?.itinerary.filter(i => i.date === selectedDate.value) ||[],
           set: (val) => {
             if (!currentTrip.value) return;
             const otherDays = currentTrip.value.itinerary.filter(i => i.date !== selectedDate.value);
@@ -458,10 +474,9 @@
           }
         });
 
-        // --- Checklist Functions ---
         const addChecklistItem = (category) => {
           if (!newCheckItem[category].trim()) return;
-          if (!currentTrip.value.checklist) currentTrip.value.checklist = [];
+          if (!currentTrip.value.checklist) currentTrip.value.checklist =[];
           currentTrip.value.checklist.push({
             id: Date.now(),
             category,
@@ -475,9 +490,8 @@
           currentTrip.value.checklist = currentTrip.value.checklist.filter(i => i.id !== id);
         };
 
-        // --- Map Syncing Logic (Improved) ---
         let map = null;
-        let markers = [];
+        let markers =[];
         const isMapLoading = ref(false);
         const mapStatusText = ref('');
 
@@ -490,7 +504,7 @@
         const updateMapMarkers = async () => {
           if (!map || currentTab.value !== 'map') return;
           markers.forEach(m => map.removeLayer(m));
-          markers = [];
+          markers =[];
           
           const itemsToPin = currentDayItinerary.value.filter(i => i.googleMapUrl || (i.lat && i.lng));
           if (itemsToPin.length === 0) return;
@@ -499,7 +513,6 @@
           for (const item of itemsToPin) {
             let lat = item.lat, lng = item.lng;
             
-            // 解析 Google Map URL (簡單正則)
             if (!lat && item.googleMapUrl) {
               const match = item.googleMapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
               if (match) {
@@ -526,7 +539,6 @@
           }
         }, { deep: true });
 
-        // --- Cloud Sync ---
         let syncTimeout = null;
         const saveToCloud = async () => {
           if (isLoading.value) return;
@@ -550,8 +562,8 @@
             if (docSnap.exists()) {
               trips.value = docSnap.data().trips.map(t => ({
                 ...t,
-                checklist: t.checklist || [] // 確保有 checklist 欄位
-              })) || [];
+                checklist: t.checklist || []
+              })) ||[];
               if (trips.value.length > 0) {
                 currentTripId.value = trips.value[0].id;
                 selectedDate.value = trips.value[0].dates[0];
@@ -569,7 +581,6 @@
 
         watch(trips, () => saveToCloud(), { deep: true });
 
-        // --- Other Logic (Existing) ---
         const isAddTripModalOpen = ref(false);
         const newTripForm = reactive({ name: '', startDate: '', endDate: '' });
         
@@ -582,7 +593,7 @@
           if (!newTripForm.name || !newTripForm.startDate || !newTripForm.endDate) return;
           const start = new Date(newTripForm.startDate);
           const end = new Date(newTripForm.endDate);
-          const dates = [];
+          const dates =[];
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             dates.push(`${d.getMonth() + 1}/${d.getDate()}`);
           }
@@ -592,7 +603,7 @@
             dates,
             itinerary: [],
             expenses: [],
-            checklist: [
+            checklist:[
               { id: 1, category: '文件', name: '護照', done: false },
               { id: 2, category: '文件', name: '登機證/電子機票', done: false },
               { id: 3, category: '行李', name: '充電線/行動電源', done: false }
@@ -643,25 +654,49 @@
           closeModal();
         };
 
-        const newExpense = reactive({ item: '', amount: 0, paidBy: '我', taxStatus: '無' });
+        // 調整：新增為誰付的欄位
+        const newExpense = reactive({ item: '', amount: 0, paidBy: '我', forWhom: '所有人', taxStatus: '無' });
         const addExpense = () => {
           if (!newExpense.item || !newExpense.amount) return;
           currentTrip.value.expenses.push({ id: Date.now(), ...newExpense });
-          newExpense.item = ''; newExpense.amount = 0; newExpense.taxStatus = '無';
+          newExpense.item = ''; newExpense.amount = 0; newExpense.taxStatus = '無'; newExpense.forWhom = '所有人';
         };
 
         const deleteExpense = (id) => {
           currentTrip.value.expenses = currentTrip.value.expenses.filter(e => e.id !== id);
         };
 
+        // 調整：升級版分帳邏輯 (支援代墊、平分、個人獨享)
         const settlements = computed(() => {
-          if (!currentTrip.value) return [];
+          if (!currentTrip.value) return[];
           const bal = {};
           currentTrip.value.people.forEach(p => bal[p] = 0);
+          
           currentTrip.value.expenses.forEach(e => {
-            const share = (e.amount * currentTrip.value.exchangeRate) / currentTrip.value.people.length;
-            currentTrip.value.people.forEach(p => p === e.paidBy ? bal[p] += (e.amount * currentTrip.value.exchangeRate) - share : bal[p] -= share);
+            // 決定這個花費有誰要來分擔
+            let sharedBy =[];
+            if (e.forWhom === '所有人' || !e.forWhom) {
+              sharedBy = currentTrip.value.people;
+            } else {
+              sharedBy = [e.forWhom]; // 只有特定某個人要付
+            }
+
+            const amountInNTD = e.amount * (currentTrip.value.exchangeRate || 1);
+            const share = amountInNTD / sharedBy.length;
+            
+            // 付款人獲得全額債權
+            if (bal[e.paidBy] !== undefined) {
+              bal[e.paidBy] += amountInNTD;
+            }
+            
+            // 分攤的人扣除分攤額
+            sharedBy.forEach(p => {
+              if (bal[p] !== undefined) {
+                bal[p] -= share;
+              }
+            });
           });
+
           const res = [];
           const debtors = Object.entries(bal).filter(x => x[1] < -0.1).map(x => ({ p: x[0], b: Math.abs(x[1]) }));
           const creditors = Object.entries(bal).filter(x => x[1] > 0.1).map(x => ({ p: x[0], b: x[1] }));

@@ -10,8 +10,8 @@
   <meta name="apple-mobile-web-app-title" content="TripApp">
   <meta name="mobile-web-app-capable" content="yes">
   
-  <link rel="apple-touch-icon" href="https://api.dicebear.com/8.x/icons/svg?seed=TripAppBag&icon=luggage&backgroundColor=78929c&color=ffffff&padding=15">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://api.dicebear.com/8.x/icons/svg?seed=TripAppBag&icon=luggage&backgroundColor=78929c&color=ffffff&padding=15">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/180/ffffff/luggage.png" style="background-color: #78929c;">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/ios-filled/192/ffffff/luggage.png" style="background-color: #78929c;">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -51,6 +51,7 @@
     .leaflet-control-container { z-index: 10; }
     .btn-nav-pulse { animation: pulse-blue 2s infinite; }
     @keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+    .custom-div-icon { background: transparent; border: none; }
   </style>
 </head>
 
@@ -88,7 +89,6 @@
       </div>
     </div>
 
-    <!-- 調整：增加整體介面的 padding-top 讓畫面往下移 -->
     <header class="bg-primary text-[#f9f6f0] pb-3 px-5 rounded-b-2xl shadow-md z-20 shrink-0 flex items-center justify-between" style="padding-top: max(3rem, env(safe-area-inset-top));">
       <div class="flex items-center gap-3">
         <button @click="isSidebarOpen = true" class="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center text-lg transition-colors">
@@ -105,6 +105,7 @@
     </header>
 
     <main class="flex-1 flex flex-col overflow-hidden relative" v-if="currentTrip">
+      <!-- 頂部日期標籤 -->
       <div v-show="currentTab === 'itinerary' || currentTab === 'map'" class="shrink-0 px-4 pt-4 pb-2 bg-[#f9f6f0] z-20 shadow-sm border-b border-[#e8e2d9]/50">
         <div class="flex overflow-x-auto no-scrollbar gap-2 snap-x">
           <button v-for="(date, index) in currentTrip.dates" :key="date" @click="selectedDate = date" class="flex-none w-16 h-14 rounded-xl text-xs font-bold transition-all shadow-sm flex flex-col items-center justify-center snap-center border" :class="selectedDate === date ? 'bg-primary-light text-white scale-105 border-primary-light' : 'bg-white text-[#8c7a6b] border-[#e8e2d9]'">
@@ -114,6 +115,7 @@
         </div>
       </div>
 
+      <!-- 行程分頁 -->
       <div v-show="currentTab === 'itinerary'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 relative">
         <div v-if="weatherLoading" class="bg-white/50 border border-dashed border-[#e8e2d9] rounded-xl p-4 mb-4 flex items-center justify-center space-x-2">
           <i class="fa-solid fa-spinner fa-spin text-primary text-xs"></i>
@@ -145,7 +147,11 @@
           <draggable v-model="currentDayItinerary" item-key="id" handle=".drag-handle" ghost-class="sortable-ghost" :animation="200">
             <template #item="{ element: item, index }">
               <div class="relative pl-5 mb-8">
-                <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10"></div>
+                <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10 flex items-center justify-center">
+                  <span class="absolute -left-6 top-[-4px] w-5 h-5 bg-[#8c7a6b] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                    {{ index + 1 }}
+                  </span>
+                </div>
                 <div :class="item.type === 'flight' ? 'bg-primary text-white border border-primary-light shadow-md p-2' : 'bg-white border border-[#e8e2d9] text-[#4a4036] p-3.5'" class="rounded-xl shadow-sm relative overflow-hidden">
                   <div class="flex justify-between items-start mb-1 relative z-10">
                     <div class="flex flex-wrap items-center gap-2">
@@ -164,12 +170,16 @@
                     </div>
                   </div>
                   <h3 class="font-bold relative z-10" :class="item.type === 'flight' ? 'text-xs mt-0.5' : 'text-sm'">{{ item.title }}</h3>
+                  
+                  <div v-if="item.lat && item.lng" class="mt-1 flex items-center gap-1 text-[9px] text-[#8c7a6b] font-medium">
+                    <i class="fa-solid fa-location-crosshairs text-green-600"></i> 已釘選在地圖
+                  </div>
+
                   <div v-if="item.type === 'flight' && (item.flightDep || item.flightDest)" class="mt-2 flex items-center text-[11px] font-bold text-white/95 bg-black/20 w-fit px-2.5 py-1 rounded-lg relative z-10 shadow-inner">
                     <span>{{ item.flightDep || '出發地' }}</span>
                     <i class="fa-solid fa-plane text-[10px] mx-2 opacity-70"></i>
                     <span>{{ item.flightDest || '目的地' }}</span>
                   </div>
-                  <!-- 調整：備註字體放大、增加 padding -->
                   <p v-if="item.remark" :class="item.type === 'flight' ? 'bg-black/10 text-white/90 p-2 mt-1.5 text-xs' : 'bg-[#f9f6f0] text-[#4a4036] p-3 mt-2 text-sm leading-relaxed'" class="rounded-lg font-medium relative z-10 whitespace-pre-wrap">{{ item.remark }}</p>
                 </div>
                 <div v-if="index < currentDayItinerary.length - 1 && item.transitTime" class="absolute -bottom-[22px] left-[-6px] z-10 flex items-center py-1">
@@ -189,6 +199,7 @@
         </button>
       </div>
 
+      <!-- 地圖分頁 -->
       <div v-show="currentTab === 'map'" class="flex-1 w-full relative">
         <div v-if="isMapLoading" class="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-primary">
             <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
@@ -199,16 +210,16 @@
           <div class="flex justify-between items-center">
             <div>
               <h3 class="font-bold text-[#4a4036] text-xs"><i class="fa-solid fa-location-dot text-primary mr-2"></i>Day {{ currentTrip.dates.indexOf(selectedDate) + 1 }} 景點分布</h3>
+              <p class="text-[9px] text-[#8c7a6b] mt-0.5">顯示已定位之行程路徑</p>
             </div>
-            <button @click="centerOnUser" class="bg-primary text-white text-[10px] px-4 py-2 rounded-lg active:scale-95 shadow-md flex items-center">
-              <i class="fa-solid fa-crosshairs mr-1.5"></i> 定位
-            </button>
           </div>
         </div>
       </div>
 
+      <!-- 準備清單分頁 (兩大分類：文件、行李) -->
       <div v-show="currentTab === 'checklist'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-4">
-        <div v-for="cat in['文件', '行李']" :key="cat" class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
+        <!-- 核心的 v-for 迴圈維持 ['文件', '行李']，自動生成這兩大類別 -->
+        <div v-for="cat in ['文件', '行李']" :key="cat" class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
           <div class="bg-[#eae5dc] px-4 py-2 text-xs font-bold text-primary flex items-center">
             <i :class="cat === '文件' ? 'fa-solid fa-file-invoice' : 'fa-solid fa-suitcase'" class="mr-2"></i> {{ cat }}
           </div>
@@ -221,14 +232,16 @@
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
+            <!-- 輸入框與加入按鈕 -->
             <div class="flex gap-2 p-2 pt-3 border-t border-[#f0ebe1]">
-              <input type="text" v-model="newCheckItem[cat]" @keyup.enter="addChecklistItem(cat)" placeholder="新增項目..." class="flex-1 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-[11px]">
-              <button @click="addChecklistItem(cat)" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-bold">加入</button>
+              <input type="text" v-model="newCheckItem[cat]" @keyup.enter="addChecklistItem(cat)" :placeholder="`新增${cat}項目...`" class="flex-1 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-[11px] outline-none focus:border-primary/50">
+              <button @click="addChecklistItem(cat)" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-bold active:scale-95">加入</button>
             </div>
           </div>
         </div>
       </div>
 
+      <!-- 分帳分頁 -->
       <div v-show="currentTab === 'split'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-5">
         <div class="bg-white p-4 rounded-xl shadow-sm border border-[#e8e2d9] flex justify-between items-center">
           <div class="flex items-center gap-2">
@@ -258,7 +271,6 @@
               </span>
             </div>
             
-            <!-- 調整：分帳升級，加入「為誰付」選項 -->
             <div class="flex gap-2">
               <div class="w-1/2 flex items-center bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-2 py-1.5">
                 <span class="text-[10px] text-[#8c7a6b] font-bold mr-1.5 whitespace-nowrap">付款人:</span>
@@ -332,6 +344,7 @@
       </button>
     </nav>
 
+    <!-- Modal 區塊 -->
     <div v-if="isModalOpen" class="fixed inset-0 bg-[#4a4036]/60 z-[700] flex items-end justify-center backdrop-blur-sm">
       <div class="bg-[#f9f6f0] w-full max-md rounded-t-2xl p-5 pb-8 shadow-2xl max-h-[85vh] overflow-y-auto no-scrollbar">
         <div class="flex justify-between items-center mb-4 border-b border-[#e8e2d9] pb-3">
@@ -372,24 +385,47 @@
             <input v-model="form.title" type="text" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1">
           </div>
           
-          <div v-if="form.type === 'normal'">
-            <label class="text-[10px] text-primary font-bold uppercase flex items-center">
-              <i class="fa-solid fa-car-side mr-1"></i> 下個行程預估移動時間
+          <div v-if="form.type === 'normal'" class="bg-[#eae5dc]/50 p-3 rounded-xl border border-[#dcd3cb]/50">
+            <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest flex items-center mb-1.5">
+              <i class="fa-solid fa-map-location-dot mr-1 text-blue-500"></i> 自動地圖定位
             </label>
-            <input v-model="form.transitTime" type="text" placeholder="例如：步行 15 分鐘 / 自駕 20 分鐘" class="w-full bg-white border border-primary/30 rounded-lg px-3 py-2 text-xs mt-1 focus:border-primary outline-none">
+            <div class="flex gap-2">
+              <input v-model="form.searchQuery" type="text" placeholder="請輸入地標名稱或地址 (如: 台北101)" class="flex-1 bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" @keyup.enter="searchLocation">
+              <button @click="searchLocation" type="button" class="bg-blue-500 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-magnifying-glass" v-if="!isSearchingLoc"></i>
+                <i class="fa-solid fa-spinner fa-spin" v-else></i>
+                <span v-if="!isSearchingLoc">搜尋定位</span>
+              </button>
+            </div>
+            <div class="flex items-center justify-between mt-2">
+              <div v-if="form.lat && form.lng" class="text-[10px] text-green-600 font-bold flex items-center bg-green-50 px-2 py-1 rounded">
+                <i class="fa-solid fa-check-circle mr-1"></i> 已定位: ({{ parseFloat(form.lat).toFixed(4) }}, {{ parseFloat(form.lng).toFixed(4) }})
+              </div>
+              <div v-else class="text-[10px] text-[#8c7a6b]">尚未取得座標定位</div>
+              
+              <button v-if="form.lat && form.lng" @click="form.lat = null; form.lng = null;" class="text-[10px] text-red-400 hover:text-red-600 font-bold ml-2">清除定位</button>
+            </div>
           </div>
 
           <div v-if="form.type === 'normal'">
             <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest flex items-center">
-              Google Map 網址 <span class="ml-2 text-[8px] text-blue-400 font-normal">填寫網址才會顯示在地圖上</span>
+              Google Map 網址 <span class="ml-2 text-[8px] opacity-60 font-normal">(選填)</span>
             </label>
             <input v-model="form.googleMapUrl" type="url" placeholder="http://maps.google.com/?q=..." class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-[10px] mt-1 text-blue-600">
           </div>
+
+          <div v-if="form.type === 'normal'">
+            <label class="text-[10px] text-[#8c7a6b] font-bold uppercase flex items-center">
+              <i class="fa-solid fa-car-side mr-1"></i> 距離下個行程移動時間預估
+            </label>
+            <input v-model="form.transitTime" type="text" placeholder="例如：步行 15 分鐘 / 捷運 20 分鐘" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1 outline-none">
+          </div>
+
           <div>
             <label class="text-[10px] text-[#8c7a6b] font-bold uppercase tracking-widest">備註 / 資訊</label>
             <textarea v-model="form.remark" rows="3" class="w-full bg-white border border-[#dcd3cb] rounded-lg px-3 py-2 text-xs mt-1"></textarea>
           </div>
-          <button @click="saveItinerary" class="w-full bg-primary text-white rounded-lg py-3 font-bold text-sm active:scale-95">儲存行程</button>
+          <button @click="saveItinerary" class="w-full bg-primary text-white rounded-lg py-3 font-bold text-sm active:scale-95 shadow-md">儲存行程</button>
           <button v-if="modalMode === 'edit'" @click="deleteItinerary(form.id)" class="w-full text-red-500 font-bold text-xs py-2">刪除此行程</button>
         </div>
       </div>
@@ -448,6 +484,7 @@
         const weatherLoading = ref(false);
         const currentTab = ref('itinerary');
         const isSidebarOpen = ref(false);
+        const isSearchingLoc = ref(false);
 
         const tabs = {
           itinerary: { label: '行程', title: '行程表', icon: 'fa-regular fa-calendar' },
@@ -460,6 +497,8 @@
         const currentTripId = ref(null);
         const selectedDate = ref('');
         const tripToDelete = ref(null);
+        
+        // Checklist 初始化兩大分類物件，保持綁定對應文字
         const newCheckItem = reactive({ '文件': '', '行李': '' });
 
         const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
@@ -491,6 +530,7 @@
 
         let map = null;
         let markers =[];
+        let routePolyline = null;
         const isMapLoading = ref(false);
         const mapStatusText = ref('');
 
@@ -502,14 +542,18 @@
 
         const updateMapMarkers = async () => {
           if (!map || currentTab.value !== 'map') return;
+          
           markers.forEach(m => map.removeLayer(m));
           markers =[];
+          if (routePolyline) {
+            map.removeLayer(routePolyline);
+            routePolyline = null;
+          }
           
-          const itemsToPin = currentDayItinerary.value.filter(i => i.googleMapUrl || (i.lat && i.lng));
-          if (itemsToPin.length === 0) return;
-
+          const validPoints =[];
           const bounds = L.latLngBounds();
-          for (const item of itemsToPin) {
+          
+          currentDayItinerary.value.forEach((item, index) => {
             let lat = item.lat, lng = item.lng;
             
             if (!lat && item.googleMapUrl) {
@@ -521,12 +565,35 @@
             }
 
             if (lat && lng) {
-              const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${item.title}</b><br>${item.time}`);
+              const customIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="bg-primary text-white rounded-full w-7 h-7 flex items-center justify-center font-bold border-[2.5px] border-white shadow-lg text-xs hover:scale-110 transition-transform">${index + 1}</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+              });
+
+              const marker = L.marker([lat, lng], { icon: customIcon })
+                .addTo(map)
+                .bindPopup(`<div class="font-bold text-[#4a4036] text-sm mb-1">${index + 1}. ${item.title}</div><div class="text-xs text-[#8c7a6b]"><i class="fa-regular fa-clock mr-1"></i>${item.time}</div>`);
+              
               markers.push(marker);
+              validPoints.push([lat, lng]);
               bounds.extend([lat, lng]);
             }
+          });
+
+          if (validPoints.length > 1) {
+            routePolyline = L.polyline(validPoints, { 
+              color: '#3b82f6', 
+              weight: 3, 
+              dashArray: '6, 8', 
+              opacity: 0.7 
+            }).addTo(map);
           }
-          if (markers.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
+
+          if (validPoints.length > 0) {
+            map.fitBounds(bounds, { padding:[60, 60], maxZoom: 16 });
+          }
         };
 
         watch([currentTab, selectedDate, currentDayItinerary], () => {
@@ -601,7 +668,7 @@
             name: newTripForm.name,
             dates,
             itinerary: [],
-            expenses: [],
+            expenses:[],
             checklist:[
               { id: 1, category: '文件', name: '護照', done: false },
               { id: 2, category: '文件', name: '登機證/電子機票', done: false },
@@ -624,17 +691,18 @@
 
         const isModalOpen = ref(false);
         const modalMode = ref('add');
-        const form = reactive({ id: null, type: 'normal', date: '', time: '08:00', title: '', remark: '', googleMapUrl: '', transitTime: '', flightDep: '', flightDest: '' });
+        const form = reactive({ id: null, type: 'normal', date: '', time: '08:00', title: '', remark: '', googleMapUrl: '', transitTime: '', flightDep: '', flightDest: '', lat: null, lng: null, searchQuery: '' });
 
         const openAddModal = () => {
           modalMode.ref = 'add';
-          Object.assign(form, { id: Date.now(), type: 'normal', date: selectedDate.value, time: '08:00', title: '', remark: '', googleMapUrl: '', transitTime: '', flightDep: '', flightDest: '' });
+          Object.assign(form, { id: Date.now(), type: 'normal', date: selectedDate.value, time: '08:00', title: '', remark: '', googleMapUrl: '', transitTime: '', flightDep: '', flightDest: '', lat: null, lng: null, searchQuery: '' });
           isModalOpen.value = true;
         };
 
         const openEditModal = (item) => {
           modalMode.value = 'edit';
           Object.assign(form, item);
+          form.searchQuery = item.title || '';
           isModalOpen.value = true;
         };
 
@@ -653,7 +721,42 @@
           closeModal();
         };
 
-        // 調整：新增為誰付的欄位
+        const searchLocation = async () => {
+          if (!form.searchQuery || isSearchingLoc.value) return;
+          isSearchingLoc.value = true;
+          try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(form.searchQuery)}`);
+            const data = await response.json();
+            
+            if (data && data.length > 0) {
+              form.lat = parseFloat(data[0].lat);
+              form.lng = parseFloat(data[0].lon);
+              if (!form.title) {
+                form.title = data[0].name || form.searchQuery;
+              }
+            } else {
+              alert('找不到該地標或地址，請嘗試輸入更完整的名稱！');
+            }
+          } catch (e) {
+            console.error(e);
+            alert('定位服務目前發生錯誤，請稍後再試。');
+          } finally {
+            isSearchingLoc.value = false;
+          }
+        };
+
+        const startNavigation = (item) => {
+          if (item.googleMapUrl) {
+            window.open(item.googleMapUrl, '_blank');
+          } 
+          else if (item.lat && item.lng) {
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}`, '_blank');
+          } 
+          else if (item.title) {
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.title)}`, '_blank');
+          }
+        };
+
         const newExpense = reactive({ item: '', amount: 0, paidBy: '我', forWhom: '所有人', taxStatus: '無' });
         const addExpense = () => {
           if (!newExpense.item || !newExpense.amount) return;
@@ -665,30 +768,25 @@
           currentTrip.value.expenses = currentTrip.value.expenses.filter(e => e.id !== id);
         };
 
-        // 調整：升級版分帳邏輯 (支援代墊、平分、個人獨享)
         const settlements = computed(() => {
           if (!currentTrip.value) return[];
           const bal = {};
           currentTrip.value.people.forEach(p => bal[p] = 0);
           
           currentTrip.value.expenses.forEach(e => {
-            // 決定這個花費有誰要來分擔
             let sharedBy =[];
             if (e.forWhom === '所有人' || !e.forWhom) {
               sharedBy = currentTrip.value.people;
             } else {
-              sharedBy = [e.forWhom]; // 只有特定某個人要付
+              sharedBy = [e.forWhom]; 
             }
 
             const amountInNTD = e.amount * (currentTrip.value.exchangeRate || 1);
             const share = amountInNTD / sharedBy.length;
             
-            // 付款人獲得全額債權
             if (bal[e.paidBy] !== undefined) {
               bal[e.paidBy] += amountInNTD;
             }
-            
-            // 分攤的人扣除分攤額
             sharedBy.forEach(p => {
               if (bal[p] !== undefined) {
                 bal[p] -= share;
@@ -713,7 +811,8 @@
           loadingText, isLoading, isSyncing, weatherLoading, currentTab, tabs, isSidebarOpen, trips, currentTripId, currentTrip,
           selectTrip, confirmDeleteTrip: (t) => tripToDelete.value = t, tripToDelete, executeDeleteTrip: () => { trips.value = trips.value.filter(t => t.id !== tripToDelete.value.id); tripToDelete.value = null; },
           isAddTripModalOpen, newTripForm, openAddTripModal, createNewTrip, selectedDate, currentDayItinerary, isModalOpen, modalMode, form,
-          openAddModal, openEditModal, closeModal, saveItinerary, deleteItinerary, isMapLoading, mapStatusText, centerOnUser: () => {}, startNavigation: (i) => window.open(i.googleMapUrl, '_blank'),
+          openAddModal, openEditModal, closeModal, saveItinerary, deleteItinerary, isMapLoading, mapStatusText, centerOnUser: () => {}, 
+          startNavigation, searchLocation, isSearchingLoc,
           newExpense, addExpense, deleteExpense, settlements, 
           newCheckItem, addChecklistItem, removeChecklistItem,
           getWeatherIcon: () => 'fa-solid fa-sun', currentDayWeather: null, openCWAWeather: () => {}

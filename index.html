@@ -9,12 +9,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="TripApp">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#6a5a4e">
 
-  <link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/color/180/luggage.png?v=2">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/192/luggage.png?v=2">
-  <link rel="icon" type="image/png" sizes="512x512" href="https://img.icons8.com/color/512/luggage.png?v=2">
-
+  <link rel="apple-touch-icon" href="https://api.dicebear.com/7.x/initials/svg?seed=TripApp&backgroundColor=6a5a4e&fontSize=35&fontWeight=700&fontFamily=Arial&chars=1">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://api.dicebear.com/7.x/initials/svg?seed=TripApp&backgroundColor=6a5a4e&fontSize=35&fontWeight=700&fontFamily=Arial&chars=1">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -108,7 +105,6 @@
     </header>
 
     <main class="flex-1 flex flex-col overflow-hidden relative" v-if="currentTrip">
-      <!-- 頂部日期標籤 -->
       <div v-show="currentTab === 'itinerary' || currentTab === 'map'" class="shrink-0 px-4 pt-4 pb-2 bg-[#f9f6f0] z-20 shadow-sm border-b border-[#e8e2d9]/50">
         <div class="flex overflow-x-auto no-scrollbar gap-2 snap-x">
           <button v-for="(date, index) in currentTrip.dates" :key="date" @click="selectedDate = date" class="flex-none w-16 h-14 rounded-xl text-xs font-bold transition-all shadow-sm flex flex-col items-center justify-center snap-center border" :class="selectedDate === date ? 'bg-primary-light text-white scale-105 border-primary-light' : 'bg-white text-[#8c7a6b] border-[#e8e2d9]'">
@@ -118,7 +114,6 @@
         </div>
       </div>
 
-      <!-- 行程分頁 -->
       <div v-show="currentTab === 'itinerary'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 relative">
         <div v-if="weatherLoading" class="bg-white/50 border border-dashed border-[#e8e2d9] rounded-xl p-4 mb-4 flex items-center justify-center space-x-2">
           <i class="fa-solid fa-spinner fa-spin text-primary text-xs"></i>
@@ -150,11 +145,9 @@
           <draggable v-model="currentDayItinerary" item-key="id" handle=".drag-handle" ghost-class="sortable-ghost" :animation="200">
             <template #item="{ element: item, index }">
               <div class="relative pl-5 mb-8">
-                <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10 flex items-center justify-center">
-                  <span class="absolute -left-6 top-[-4px] w-5 h-5 bg-[#8c7a6b] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                    {{ index + 1 }}
-                  </span>
-                </div>
+                <!-- 保持乾淨的藍灰色小圓點 -->
+                <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10"></div>
+                
                 <div :class="item.type === 'flight' ? 'bg-primary text-white border border-primary-light shadow-md p-2' : 'bg-white border border-[#e8e2d9] text-[#4a4036] p-3.5'" class="rounded-xl shadow-sm relative overflow-hidden">
                   <div class="flex justify-between items-start mb-1 relative z-10">
                     <div class="flex flex-wrap items-center gap-2">
@@ -202,7 +195,6 @@
         </button>
       </div>
 
-      <!-- 地圖分頁 -->
       <div v-show="currentTab === 'map'" class="flex-1 w-full relative">
         <div v-if="isMapLoading" class="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-primary">
             <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
@@ -219,9 +211,8 @@
         </div>
       </div>
 
-      <!-- 準備清單分頁 (兩大分類：文件、行李) -->
+      <!-- 準備清單分頁：確保 v-for 正確執行，恢復「文件」跟「行李」分類 -->
       <div v-show="currentTab === 'checklist'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-4">
-        <!-- 核心的 v-for 迴圈維持 ['文件', '行李']，自動生成這兩大類別 -->
         <div v-for="cat in ['文件', '行李']" :key="cat" class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
           <div class="bg-[#eae5dc] px-4 py-2 text-xs font-bold text-primary flex items-center">
             <i :class="cat === '文件' ? 'fa-solid fa-file-invoice' : 'fa-solid fa-suitcase'" class="mr-2"></i> {{ cat }}
@@ -235,7 +226,6 @@
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
-            <!-- 輸入框與加入按鈕 -->
             <div class="flex gap-2 p-2 pt-3 border-t border-[#f0ebe1]">
               <input type="text" v-model="newCheckItem[cat]" @keyup.enter="addChecklistItem(cat)" :placeholder="`新增${cat}項目...`" class="flex-1 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-[11px] outline-none focus:border-primary/50">
               <button @click="addChecklistItem(cat)" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-bold active:scale-95">加入</button>
@@ -244,7 +234,6 @@
         </div>
       </div>
 
-      <!-- 分帳分頁 -->
       <div v-show="currentTab === 'split'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-5">
         <div class="bg-white p-4 rounded-xl shadow-sm border border-[#e8e2d9] flex justify-between items-center">
           <div class="flex items-center gap-2">
@@ -331,14 +320,6 @@
       </div>
     </main>
 
-    <main class="flex-1 overflow-y-auto no-scrollbar relative flex items-center justify-center" v-else>
-      <div class="text-center text-[#8c7a6b]">
-        <i class="fa-solid fa-suitcase-rolling text-4xl mb-3 opacity-50"></i>
-        <p class="font-bold text-sm">目前沒有旅程</p>
-        <button @click="openAddTripModal" class="mt-4 bg-primary text-white px-4 py-2 rounded-lg text-xs font-bold">建立新旅程</button>
-      </div>
-    </main>
-
     <nav class="bg-white border-t border-[#dcd3cb] px-4 py-2 flex justify-around shrink-0 z-40">
       <button v-for="(tabInfo, key) in tabs" :key="key" @click="currentTab = key" class="flex flex-col items-center p-1 w-16 transition-all" :class="currentTab === key ? 'text-primary' : 'text-[#bfae9f]'">
         <i :class="tabInfo.icon" class="text-lg mb-0.5"></i>
@@ -347,7 +328,6 @@
       </button>
     </nav>
 
-    <!-- Modal 區塊 -->
     <div v-if="isModalOpen" class="fixed inset-0 bg-[#4a4036]/60 z-[700] flex items-end justify-center backdrop-blur-sm">
       <div class="bg-[#f9f6f0] w-full max-md rounded-t-2xl p-5 pb-8 shadow-2xl max-h-[85vh] overflow-y-auto no-scrollbar">
         <div class="flex justify-between items-center mb-4 border-b border-[#e8e2d9] pb-3">
@@ -501,7 +481,6 @@
         const selectedDate = ref('');
         const tripToDelete = ref(null);
         
-        // Checklist 初始化兩大分類物件，保持綁定對應文字
         const newCheckItem = reactive({ '文件': '', '行李': '' });
 
         const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
@@ -511,7 +490,7 @@
           set: (val) => {
             if (!currentTrip.value) return;
             const otherDays = currentTrip.value.itinerary.filter(i => i.date !== selectedDate.value);
-            currentTrip.value.itinerary = [...otherDays, ...val].sort((a, b) => a.time.localeCompare(b.time));
+            currentTrip.value.itinerary =[...otherDays, ...val].sort((a, b) => a.time.localeCompare(b.time));
           }
         });
 
@@ -595,7 +574,7 @@
           }
 
           if (validPoints.length > 0) {
-            map.fitBounds(bounds, { padding:[60, 60], maxZoom: 16 });
+            map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
           }
         };
 
@@ -671,7 +650,7 @@
             name: newTripForm.name,
             dates,
             itinerary: [],
-            expenses:[],
+            expenses: [],
             checklist:[
               { id: 1, category: '文件', name: '護照', done: false },
               { id: 2, category: '文件', name: '登機證/電子機票', done: false },
@@ -797,7 +776,7 @@
             });
           });
 
-          const res = [];
+          const res =[];
           const debtors = Object.entries(bal).filter(x => x[1] < -0.1).map(x => ({ p: x[0], b: Math.abs(x[1]) }));
           const creditors = Object.entries(bal).filter(x => x[1] > 0.1).map(x => ({ p: x[0], b: x[1] }));
           let d = 0, c = 0;

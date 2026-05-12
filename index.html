@@ -9,10 +9,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="TripApp">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#6a5a4e">
 
-  <link rel="apple-touch-icon" href="https://api.dicebear.com/7.x/initials/svg?seed=TripApp&backgroundColor=6a5a4e&fontSize=35&fontWeight=700&fontFamily=Arial&chars=1">
-  <link rel="icon" type="image/png" sizes="192x192" href="https://api.dicebear.com/7.x/initials/svg?seed=TripApp&backgroundColor=6a5a4e&fontSize=35&fontWeight=700&fontFamily=Arial&chars=1">
-  <link rel="apple-touch-icon" href="https://img.icons8.com/plasticine/200/airplane-take-off.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/color/180/luggage.png?v=4">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/color/192/luggage.png?v=4">
+  <link rel="icon" type="image/png" sizes="512x512" href="https://img.icons8.com/color/512/luggage.png?v=4">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -46,7 +47,6 @@
     .app-container { background-color: #f9f6f0; }
     .bg-primary { background-color: #6a5a4e; }
     .bg-primary-light { background-color: #8c7a6b; }
-    /* 調整底部留白，讓圖示更往下靠 */
     .nav-safe-bottom { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
     .sortable-ghost { opacity: 0.4; background-color: #eae5dc; border-radius: 1rem; }
     .loading-overlay { position: fixed; inset: 0; background: rgba(249, 246, 240, 0.9); z-index: 1000; display: flex; align-items: center; justify-content: center; }
@@ -56,7 +56,7 @@
     .custom-div-icon { background: transparent; border: none; }
   </style>
 </head>
-  
+
 <body>
   <div id="app" class="max-w-md mx-auto app-container relative overflow-hidden shadow-2xl">
     <div v-if="isLoading" class="loading-overlay">
@@ -147,7 +147,7 @@
           <draggable v-model="currentDayItinerary" item-key="id" handle=".drag-handle" ghost-class="sortable-ghost" :animation="200">
             <template #item="{ element: item, index }">
               <div class="relative pl-5 mb-8">
-                <!-- 保持乾淨的藍灰色小圓點 -->
+                <!-- 行程列表旁：乾淨的藍灰色小圓點 (不顯示數字) -->
                 <div class="absolute w-3 h-3 bg-primary-light rounded-full -left-[7px] top-1.5 border-2 border-[#f9f6f0] z-10"></div>
                 
                 <div :class="item.type === 'flight' ? 'bg-primary text-white border border-primary-light shadow-md p-2' : 'bg-white border border-[#e8e2d9] text-[#4a4036] p-3.5'" class="rounded-xl shadow-sm relative overflow-hidden">
@@ -192,7 +192,7 @@
           </draggable>
           <div v-if="currentDayItinerary.length === 0" class="pl-5 py-4 text-[#bfae9f] text-[10px] italic">尚未安排行程</div>
         </div>
-        <button @click="openAddModal" class="fixed bottom-24 right-6 w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center text-xl hover:bg-primary-light active:scale-90 transition-all z-30">
+        <button @click="openAddModal" class="fixed bottom-20 right-6 w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center text-xl hover:bg-primary-light active:scale-90 transition-all z-30">
           <i class="fa-solid fa-plus"></i>
         </button>
       </div>
@@ -213,14 +213,16 @@
         </div>
       </div>
 
-      <!-- 準備清單分頁：確保 v-for 正確執行，恢復「文件」跟「行李」分類 -->
+      <!-- 準備清單分頁：將兩大類別徹底拆分寫死，絕對防呆 -->
       <div v-show="currentTab === 'checklist'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-4">
-        <div v-for="cat in ['文件', '行李']" :key="cat" class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
+        
+        <!-- 第一類：文件 -->
+        <div class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
           <div class="bg-[#eae5dc] px-4 py-2 text-xs font-bold text-primary flex items-center">
-            <i :class="cat === '文件' ? 'fa-solid fa-file-invoice' : 'fa-solid fa-suitcase'" class="mr-2"></i> {{ cat }}
+            <i class="fa-solid fa-file-invoice mr-2"></i> 文件
           </div>
           <div class="p-2 space-y-1">
-            <div v-for="(item, idx) in currentTrip.checklist.filter(i => i.category === cat)" :key="idx" 
+            <div v-for="item in (currentTrip.checklist ||[]).filter(i => i.category === '文件')" :key="item.id" 
                  class="flex items-center p-2 hover:bg-[#f9f6f0] rounded-lg transition-colors group">
               <input type="checkbox" v-model="item.done" class="w-4 h-4 rounded border-[#dcd3cb] text-primary focus:ring-primary mr-3">
               <span class="flex-1 text-sm" :class="item.done ? 'line-through text-[#bfae9f]' : 'text-[#4a4036]'">{{ item.name }}</span>
@@ -229,11 +231,33 @@
               </button>
             </div>
             <div class="flex gap-2 p-2 pt-3 border-t border-[#f0ebe1]">
-              <input type="text" v-model="newCheckItem[cat]" @keyup.enter="addChecklistItem(cat)" :placeholder="`新增${cat}項目...`" class="flex-1 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-[11px] outline-none focus:border-primary/50">
-              <button @click="addChecklistItem(cat)" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-bold active:scale-95">加入</button>
+              <input type="text" v-model="newCheckItem['文件']" @keyup.enter="addChecklistItem('文件')" placeholder="新增文件項目..." class="flex-1 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-[11px] outline-none focus:border-primary/50">
+              <button @click="addChecklistItem('文件')" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-bold active:scale-95">加入</button>
             </div>
           </div>
         </div>
+
+        <!-- 第二類：行李 -->
+        <div class="bg-white rounded-xl shadow-sm border border-[#e8e2d9] overflow-hidden">
+          <div class="bg-[#eae5dc] px-4 py-2 text-xs font-bold text-primary flex items-center">
+            <i class="fa-solid fa-suitcase mr-2"></i> 行李
+          </div>
+          <div class="p-2 space-y-1">
+            <div v-for="item in (currentTrip.checklist ||[]).filter(i => i.category === '行李')" :key="item.id" 
+                 class="flex items-center p-2 hover:bg-[#f9f6f0] rounded-lg transition-colors group">
+              <input type="checkbox" v-model="item.done" class="w-4 h-4 rounded border-[#dcd3cb] text-primary focus:ring-primary mr-3">
+              <span class="flex-1 text-sm" :class="item.done ? 'line-through text-[#bfae9f]' : 'text-[#4a4036]'">{{ item.name }}</span>
+              <button @click="removeChecklistItem(item.id)" class="opacity-0 group-hover:opacity-100 text-[#dcd3cb] hover:text-red-400 p-1">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="flex gap-2 p-2 pt-3 border-t border-[#f0ebe1]">
+              <input type="text" v-model="newCheckItem['行李']" @keyup.enter="addChecklistItem('行李')" placeholder="新增行李項目..." class="flex-1 bg-[#f9f6f0] border border-[#dcd3cb] rounded-lg px-3 py-1.5 text-[11px] outline-none focus:border-primary/50">
+              <button @click="addChecklistItem('行李')" class="bg-primary text-white px-3 py-1.5 rounded-lg text-[11px] font-bold active:scale-95">加入</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div v-show="currentTab === 'split'" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 space-y-5">
@@ -295,7 +319,7 @@
           </div>
         </div>
         <div class="space-y-2">
-          <div v-for="exp in currentTrip.expenses" :key="exp.id" class="bg-white p-3 rounded-lg shadow-sm border border-[#e8e2d9] flex justify-between items-center">
+          <div v-for="exp in (currentTrip.expenses ||[])" :key="exp.id" class="bg-white p-3 rounded-lg shadow-sm border border-[#e8e2d9] flex justify-between items-center">
             <div>
               <div class="flex items-center gap-2">
                 <p class="font-bold text-[#4a4036] text-xs">{{ exp.item }}</p>
@@ -322,7 +346,16 @@
       </div>
     </main>
 
-    <nav class="bg-white border-t border-[#dcd3cb] px-4 py-2 flex justify-around shrink-0 z-40">
+    <!-- 若沒有旅程顯示的畫面 -->
+    <main class="flex-1 overflow-y-auto no-scrollbar relative flex items-center justify-center" v-else>
+      <div class="text-center text-[#8c7a6b]">
+        <i class="fa-solid fa-suitcase-rolling text-4xl mb-3 opacity-50"></i>
+        <p class="font-bold text-sm">目前沒有旅程</p>
+        <button @click="openAddTripModal" class="mt-4 bg-primary text-white px-4 py-2 rounded-lg text-xs font-bold">建立新旅程</button>
+      </div>
+    </main>
+
+    <nav class="bg-white border-t border-[#dcd3cb] px-4 pt-2 flex justify-around shrink-0 z-40 nav-safe-bottom">
       <button v-for="(tabInfo, key) in tabs" :key="key" @click="currentTab = key" class="flex flex-col items-center p-1 w-16 transition-all" :class="currentTab === key ? 'text-primary' : 'text-[#bfae9f]'">
         <i :class="tabInfo.icon" class="text-lg mb-0.5"></i>
         <span class="text-[9px] font-bold">{{ tabInfo.label }}</span>
@@ -488,11 +521,11 @@
         const currentTrip = computed(() => trips.value.find(t => t.id === currentTripId.value));
 
         const currentDayItinerary = computed({
-          get: () => currentTrip.value?.itinerary.filter(i => i.date === selectedDate.value) ||[],
+          get: () => (currentTrip.value?.itinerary ||[]).filter(i => i.date === selectedDate.value),
           set: (val) => {
             if (!currentTrip.value) return;
-            const otherDays = currentTrip.value.itinerary.filter(i => i.date !== selectedDate.value);
-            currentTrip.value.itinerary =[...otherDays, ...val].sort((a, b) => a.time.localeCompare(b.time));
+            const otherDays = (currentTrip.value.itinerary ||[]).filter(i => i.date !== selectedDate.value);
+            currentTrip.value.itinerary = [...otherDays, ...val].sort((a, b) => a.time.localeCompare(b.time));
           }
         });
 
@@ -537,7 +570,7 @@
           const validPoints =[];
           const bounds = L.latLngBounds();
           
-          currentDayItinerary.value.forEach((item, index) => {
+          (currentDayItinerary.value ||[]).forEach((item) => {
             let lat = item.lat, lng = item.lng;
             
             if (!lat && item.googleMapUrl) {
@@ -551,14 +584,14 @@
             if (lat && lng) {
               const customIcon = L.divIcon({
                 className: 'custom-div-icon',
-                html: `<div class="bg-primary text-white rounded-full w-7 h-7 flex items-center justify-center font-bold border-[2.5px] border-white shadow-lg text-xs hover:scale-110 transition-transform">${index + 1}</div>`,
-                iconSize: [28, 28],
-                iconAnchor: [14, 14]
+                html: `<div class="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center font-bold border-[2px] border-white shadow-md text-[10px] hover:scale-110 transition-transform"><i class="fa-solid fa-location-dot"></i></div>`,
+                iconSize:[24, 24],
+                iconAnchor:[12, 12]
               });
 
               const marker = L.marker([lat, lng], { icon: customIcon })
                 .addTo(map)
-                .bindPopup(`<div class="font-bold text-[#4a4036] text-sm mb-1">${index + 1}. ${item.title}</div><div class="text-xs text-[#8c7a6b]"><i class="fa-regular fa-clock mr-1"></i>${item.time}</div>`);
+                .bindPopup(`<div class="font-bold text-[#4a4036] text-sm mb-1">${item.title}</div><div class="text-xs text-[#8c7a6b]"><i class="fa-regular fa-clock mr-1"></i>${item.time}</div>`);
               
               markers.push(marker);
               validPoints.push([lat, lng]);
@@ -612,7 +645,10 @@
             if (docSnap.exists()) {
               trips.value = docSnap.data().trips.map(t => ({
                 ...t,
-                checklist: t.checklist || []
+                itinerary: t.itinerary || [],
+                expenses: t.expenses ||[],
+                checklist: t.checklist || [],
+                people: t.people || ['我', '夥伴A']
               })) ||[];
               if (trips.value.length > 0) {
                 currentTripId.value = trips.value[0].id;
@@ -652,7 +688,7 @@
             name: newTripForm.name,
             dates,
             itinerary: [],
-            expenses: [],
+            expenses:[],
             checklist:[
               { id: 1, category: '文件', name: '護照', done: false },
               { id: 2, category: '文件', name: '登機證/電子機票', done: false },
@@ -744,6 +780,7 @@
         const newExpense = reactive({ item: '', amount: 0, paidBy: '我', forWhom: '所有人', taxStatus: '無' });
         const addExpense = () => {
           if (!newExpense.item || !newExpense.amount) return;
+          if (!currentTrip.value.expenses) currentTrip.value.expenses =[];
           currentTrip.value.expenses.push({ id: Date.now(), ...newExpense });
           newExpense.item = ''; newExpense.amount = 0; newExpense.taxStatus = '無'; newExpense.forWhom = '所有人';
         };
@@ -755,15 +792,17 @@
         const settlements = computed(() => {
           if (!currentTrip.value) return[];
           const bal = {};
-          currentTrip.value.people.forEach(p => bal[p] = 0);
+          (currentTrip.value.people || []).forEach(p => bal[p] = 0);
           
-          currentTrip.value.expenses.forEach(e => {
+          (currentTrip.value.expenses ||[]).forEach(e => {
             let sharedBy =[];
             if (e.forWhom === '所有人' || !e.forWhom) {
-              sharedBy = currentTrip.value.people;
+              sharedBy = currentTrip.value.people || [];
             } else {
-              sharedBy = [e.forWhom]; 
+              sharedBy =[e.forWhom]; 
             }
+
+            if (sharedBy.length === 0) return;
 
             const amountInNTD = e.amount * (currentTrip.value.exchangeRate || 1);
             const share = amountInNTD / sharedBy.length;
